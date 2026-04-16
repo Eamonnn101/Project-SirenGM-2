@@ -19,9 +19,7 @@ immutable, the pack is an LLM-maintained persistent middle layer, and
 runtime reads from the compiled pack + structured save instead of
 re-deriving from raw text on every turn.
 
-Version: **v0.1** — refactored from a Python CLI into the agent-native
-file-driven architecture; the legacy implementation is preserved under
-`archive/legacy_python_app/` for reference.
+Version: **v0.1** — agent-native file-driven architecture.
 
 ## Architecture
 
@@ -148,10 +146,6 @@ Project SirenGM 2/
   playbooks/               — workflow instructions for the agent
                               (ingest, new-game, play-turn, lint)
   tools/                   — optional deterministic helper scripts
-  docs/                    — plans and design docs
-
-  archive/legacy_python_app/  — prior Python-CLI implementation
-                                (reference only; do not run)
 ```
 
 ## License

@@ -34,9 +34,7 @@ saves/<save_id>/       — per-run canonical JSON state + rendered markdown
 The agent (Claude Code or Codex) is the runtime. There is no Python
 process that drives the turn loop; the agent reads files, calls its
 model, and writes files. A thin `tools/` layer provides deterministic
-helpers (chunker, lint, render, inspect) but is optional. The archived
-Python app under `archive/legacy_python_app/` is kept for reference
-only; do not run it.
+helpers (chunker, lint, render, inspect) but is optional.
 
 ## Canonical state rule
 
@@ -147,16 +145,14 @@ pack, even as "examples." That's what user packs are for.
 
 ## Things not to do
 
-- Do not reintroduce a hand-authored product-path user pack. The only
-  hand-authored pack in the repo is the archived
-  `archive/legacy_python_app/tests/fixtures/mini_user_pack/`, which is a
-  legacy test fixture — not a product path.
+- Do not reintroduce a hand-authored product-path user pack. The main
+  path is always ingest.
 - Do not scrape markdown for scene state. The JSON files are canonical.
 - Do not expand MVP scope without asking (multi-genre beyond xianxia,
   new CLI apps, web UI, combat formulas — all deferred).
 - Do not silently accept narrator facts the state patch cannot express.
   Drop them and log a `DivergenceNote`.
-- Do not reinstate the Python app as the product path. If a helper is
+- Do not reinstate a Python CLI as the product path. If a helper is
   missing, add a new script under `tools/`, not a new CLI.
 - Do not call `tools/` scripts on anything under `raw/` — those files
   are immutable input.
