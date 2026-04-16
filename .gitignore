@@ -1,0 +1,32 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+.env
+build/
+dist/
+
+# macOS / editors / local agent state
+.DS_Store
+.obsidian/
+.claude/
+
+# Test caches
+.pytest_cache/
+
+# User-supplied novels are immutable input; only the directory README is tracked.
+raw/novel/*
+!raw/novel/README.md
+!raw/novel/.gitkeep
+
+# Generated user packs — the agent writes these per novel; never check in.
+packs/*
+!packs/.gitkeep
+
+# Save states — runtime state, never shipped.
+saves/*
+!saves/.gitkeep
+
+# Ingest checkpoints (belt-and-braces — packs/* already excludes these).
+packs/*/.ingest/

@@ -1,0 +1,20 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "sirengm-tools"
+version = "0.2.0"
+description = "Optional deterministic helper tools for the SirenGM 2 llm-wiki workflow. The main product path is agent-driven and does not require this package."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "Proprietary" }
+authors = [{ name = "Eamon" }]
+dependencies = [
+    "pydantic>=2.6",
+    "pyyaml>=6.0",
+    "python-frontmatter>=1.1",
+]
+
+[tool.hatch.build.targets.wheel]
+packages = ["tools"]
