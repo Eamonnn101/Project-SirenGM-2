@@ -1,7 +1,11 @@
 """Rule-based lint for a save directory.
 
 Usage:
-    python tools/lint_save.py --save <save_id> [--pack <name>]
+    python tools/lint_save.py --save <pack>/<save_id>
+
+The `--save` argument is resolved as `saves_root / <arg>`; the
+canonical layout is `saves/<pack>/<save_id>/`. A bare `<save_id>`
+still works for legacy flat layouts.
 
 Exits 0 when clean, 1 when issues are found, 2 on usage error.
 
@@ -32,11 +36,11 @@ if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from _models import DivergenceNote, OpenLoops, RelationshipState, SessionLogEntry, WorldState
     from lint_pack import load_pack
-    from render_save import load_save
+    from render_save import _labels_for, _read_pack_language, load_save
 else:
     from ._models import DivergenceNote, OpenLoops, RelationshipState, SessionLogEntry, WorldState
     from .lint_pack import load_pack
-    from .render_save import load_save
+    from .render_save import _labels_for, _read_pack_language, load_save
 
 
 def lint_save(save_dir: Path, *, packs_root: Path | None = None) -> list[str]:
@@ -75,8 +79,10 @@ def lint_save(save_dir: Path, *, packs_root: Path | None = None) -> list[str]:
     # 4. Rendered-surface drift: current_scene.md frontmatter vs world_state.
     issues.extend(_lint_current_scene_drift(save_dir, save))
 
-    # 5. hidden_truths.md vs meta.json::hidden_truths.
-    issues.extend(_lint_hidden_truths(save_dir, save))
+    # 5. hidden_truths.md vs meta.json::hidden_truths, using the pack's language
+    #    so a zh pack's localized "# 暗线 / （暂无）" render isn't flagged as drift.
+    language = _read_pack_language(packs_root, save.pack_name) if packs_root else None
+    issues.extend(_lint_hidden_truths(save_dir, save, _labels_for(language)))
 
     # 6. Slug existence (optional — only when pack is resolvable).
     pack = _resolve_pack(save, packs_root)
@@ -123,12 +129,13 @@ def _lint_current_scene_drift(save_dir: Path, save) -> list[str]:
     return issues
 
 
-def _lint_hidden_truths(save_dir: Path, save) -> list[str]:
+def _lint_hidden_truths(save_dir: Path, save, labels: dict[str, str]) -> list[str]:
     path = save_dir / "hidden_truths.md"
     if not path.is_file():
         return ["hidden_truths.md missing (run render_save.py)"]
     hidden = save.hidden_truths.strip()
-    expected = ("# Hidden Truths\n\n" + hidden + "\n") if hidden else "# Hidden Truths\n\n(empty)\n"
+    body = hidden if hidden else labels["hidden_truths_empty"]
+    expected = f"# {labels['hidden_truths']}\n\n{body}\n"
     actual = path.read_text(encoding="utf-8")
     if actual != expected:
         return [
@@ -195,7 +202,7 @@ def _lint_slugs(save, pack) -> list[str]:
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Rule-based lint for a save directory.")
-    p.add_argument("--save", required=True, help="save id under saves/")
+    p.add_argument("--save", required=True, help="path under saves/, typically <pack>/<save_id>")
     p.add_argument("--saves-root", type=Path, default=Path("saves"))
     p.add_argument(
         "--packs-root",

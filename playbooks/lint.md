@@ -6,17 +6,20 @@ Health checks, invoked when the user says "lint the pack" or "lint the save."
 
 ```bash
 python tools/lint_pack.py --pack <name>
-python tools/lint_pack.py --genre xianxia
+python tools/lint_pack.py --genre universal
 ```
 
 Exit 0 = clean. Exit 1 = issues listed on stdout. Categorize issues:
 
-- **Schema violations** (frontmatter missing required fields) — fix the page.
-- **Cross-ref violations** (unknown sect / leader / location slug) — either
-  create the missing entity page or correct the slug on the referring page.
+- **Schema violations** (frontmatter missing required fields — including
+  `language` on user packs) — fix the page.
+- **Cross-ref violations** (unknown affiliation / leader / location slug)
+  — either create the missing entity page or correct the slug on the
+  referring page.
 - **Orphan wiki-links** (`[[slug]]` with no matching entity) — same fix.
-- **Genre purity violations** (novel-specific content in a genre pack) —
-  move it into a user pack. Genre packs are templates, never novel data.
+- **Genre purity violations** (novel-specific content in the universal
+  genre pack) — move it into the user pack's `novel_rules.md`. Genre
+  packs are templates, never novel data.
 
 Do not silence lint by editing `tools/lint_pack.py`. If a rule is wrong,
 discuss with the user and update the rule intentionally.
@@ -24,7 +27,7 @@ discuss with the user and update the rule intentionally.
 ## Save lint
 
 ```bash
-python tools/lint_save.py --save <id>
+python tools/lint_save.py --save <pack>/<save_id>
 ```
 
 This checks:

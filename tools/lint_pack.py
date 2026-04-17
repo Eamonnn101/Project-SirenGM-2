@@ -1,7 +1,7 @@
 """Rule-based lint for a genre or user pack.
 
 Usage:
-    python tools/lint_pack.py --genre xianxia
+    python tools/lint_pack.py --genre universal
     python tools/lint_pack.py --pack my_novel_pack
 
 Exits 0 when clean, 1 when issues are found, 2 on usage error.
@@ -73,11 +73,13 @@ def load_pack(pack_dir: Path) -> Pack:
     index_meta, index_fm = _load_meta_and_fm(pack_dir / "index.md")
     kind = cast(PackKind, index_fm.get("kind", "user"))
     inherits_genre = index_fm.get("inherits_genre") if kind == "user" else None
+    language = index_fm.get("language")
 
     return Pack(
         name=pack_dir.name,
         kind=kind,
         inherits_genre=inherits_genre,
+        language=language,
         index=index_meta,
         overview=_load_meta(pack_dir / "overview.md"),
         style_guide=_load_meta(pack_dir / "style_guide.md"),
@@ -104,7 +106,7 @@ def _load_meta_and_fm(path: Path) -> tuple[MetaPage | None, dict]:
         return None, {}
     post = frontmatter.load(path)
     fm = dict(post.metadata)
-    meta_fields = {k: v for k, v in fm.items() if k not in {"kind", "inherits_genre"}}
+    meta_fields = {k: v for k, v in fm.items() if k not in {"kind", "inherits_genre", "language"}}
     name = meta_fields.pop("name", None) or path.stem
     return MetaPage(name=name, body=post.content, **meta_fields), fm
 
@@ -190,6 +192,7 @@ def _lint_genre(pack, pack_dir: Path) -> list[str]:
 
 _REQUIRED_USER_PACK_FILES = (
     "index.md",
+    "novel_rules.md",
     "overview.md",
     "canon_guardrails.md",
     "timeline.md",
@@ -216,14 +219,14 @@ def _lint_user(pack, pack_dir: Path, *, genre_packs_root: Path | None) -> list[s
     if not any(c.role == "protagonist" for c in pack.characters):
         issues.append("no character has role=protagonist")
 
-    # Cross-refs: sect, controlled_by, seat, leaders.
+    # Cross-refs: affiliation, controlled_by, seat, leaders.
     faction_slugs = {f.slug for f in pack.factions}
     character_slugs = {c.slug for c in pack.characters}
     location_slugs = {l.slug for l in pack.locations}
 
     for c in pack.characters:
-        if c.sect and c.sect not in faction_slugs:
-            issues.append(f"character {c.slug!r} references unknown sect {c.sect!r}")
+        if c.affiliation and c.affiliation not in faction_slugs:
+            issues.append(f"character {c.slug!r} references unknown affiliation {c.affiliation!r}")
         if c.location and c.location not in location_slugs:
             issues.append(f"character {c.slug!r} references unknown location {c.location!r}")
     for loc in pack.locations:

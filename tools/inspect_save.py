@@ -1,11 +1,15 @@
 """Compact, read-only summary of a save's canonical state.
 
 Usage:
-    python tools/inspect_save.py --save <save_id>
+    python tools/inspect_save.py --save <pack>/<save_id>
+
+The `--save` argument is resolved as `saves_root / <arg>`; the
+canonical layout is `saves/<pack>/<save_id>/`.
 
 Prints turn/day/location/risk, player status, present entities,
-active threads, objectives, open loops (count + titles), last narration
-preview, and divergence count. Output is plain text, one save per invocation.
+active threads, objectives, open loops (count + titles), last
+narration preview, and divergence count. Output is plain text, one
+save per invocation.
 """
 
 from __future__ import annotations
@@ -24,12 +28,14 @@ else:
 def format_summary(save) -> str:
     w = save.world
     p = w.player
+    progression = f"  {p.progression}" if p.progression else ""
+    affiliation = f"  affiliation={p.affiliation}" if p.affiliation else ""
     lines: list[str] = [
         f"save:     {save.save_id}",
         f"pack:     {save.pack_name}",
         f"turn:     {w.turn}   day: {w.day}   time: {w.time_of_day}   risk: {w.risk_level}",
         f"location: {w.current_location}",
-        f"player:   {p.name} ({p.slug})  {p.cultivation_stage}  {p.status}" + (f"  sect={p.sect}" if p.sect else ""),
+        f"player:   {p.name} ({p.slug}){progression}  {p.status}{affiliation}",
     ]
     if w.present_entities:
         lines.append("present:  " + ", ".join(w.present_entities))
@@ -57,7 +63,7 @@ def format_summary(save) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    p.add_argument("--save", required=True)
+    p.add_argument("--save", required=True, help="path under saves/, typically <pack>/<save_id>")
     p.add_argument("--saves-root", type=Path, default=Path("saves"))
     args = p.parse_args(argv)
     save_dir = args.saves_root / args.save

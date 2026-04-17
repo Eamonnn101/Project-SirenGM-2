@@ -1,13 +1,22 @@
 """Re-render markdown surfaces of a save from its JSON state.
 
 Usage:
-    python tools/render_save.py --save <save_id>
+    python tools/render_save.py --save <pack>/<save_id>
 
-Reads the authoritative JSON files under saves/<save_id>/
+The `--save` argument is resolved as `saves_root / <arg>`, so the
+canonical layout is `saves/<pack>/<save_id>/`. A bare `<save_id>`
+(legacy flat layout) still works if that directory exists.
+
+Reads the authoritative JSON files under the save dir
 (`world_state.json`, `relationship_state.json`, `open_loops.json`,
-`meta.json`, `session_log.jsonl`, `divergences.jsonl`) and overwrites the
-markdown surfaces (`current_scene.md`, `player.md`, `session_log.md`,
-`hidden_truths.md`) plus `session_log.jsonl` re-normalized.
+`meta.json`, `session_log.jsonl`, `divergences.jsonl`) and overwrites
+the markdown surfaces (`current_scene.md`, `player.md`,
+`session_log.md`, `hidden_truths.md`) plus `session_log.jsonl`
+re-normalized.
+
+Labels in the rendered surfaces are picked from a per-language dictionary
+keyed by the pack's declared `language` (from `packs/<pack>/index.md`).
+Unknown languages fall back to English with a stderr warning.
 
 These markdown surfaces are display-only. JSON wins if the two disagree.
 """
@@ -18,6 +27,8 @@ import argparse
 import json
 import sys
 from pathlib import Path
+
+import frontmatter
 
 if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parent))
@@ -38,6 +49,86 @@ else:
         SessionLogEntry,
         WorldState,
     )
+
+
+# ---------------------------------------------------------------------------
+# Localized labels. Add more languages by extending this dict.
+# ---------------------------------------------------------------------------
+
+LABELS: dict[str, dict[str, str]] = {
+    "en": {
+        "current_scene": "Current Scene",
+        "turn": "Turn",
+        "day": "Day",
+        "location": "Location",
+        "risk": "Risk",
+        "present": "Present",
+        "active_threads": "Active threads",
+        "objectives": "Objectives",
+        "last_narration": "Last narration",
+        "no_narration": "(no narration yet)",
+        "player_progression": "Progression",
+        "player_affiliation": "Affiliation",
+        "player_status": "Status",
+        "player_titles": "Titles",
+        "player_inventory": "Inventory",
+        "session_log": "Session Log",
+        "turn_label": "turn",
+        "player_input": "Player",
+        "hidden_truths": "Hidden Truths",
+        "hidden_truths_empty": "(empty)",
+    },
+    "zh": {
+        "current_scene": "当前场景",
+        "turn": "回合",
+        "day": "天",
+        "location": "地点",
+        "risk": "风险",
+        "present": "在场",
+        "active_threads": "活跃线索",
+        "objectives": "目标",
+        "last_narration": "最近叙事",
+        "no_narration": "（暂无叙事）",
+        "player_progression": "修为",
+        "player_affiliation": "所属",
+        "player_status": "状态",
+        "player_titles": "称号",
+        "player_inventory": "物品",
+        "session_log": "本局日志",
+        "turn_label": "回合",
+        "player_input": "玩家",
+        "hidden_truths": "暗线",
+        "hidden_truths_empty": "（暂无）",
+    },
+}
+
+
+_WARNED_LANGUAGES: set[str] = set()
+
+
+def _labels_for(language: str | None) -> dict[str, str]:
+    if language and language in LABELS:
+        return LABELS[language]
+    if language and language not in _WARNED_LANGUAGES:
+        print(
+            f"warning: render_save has no label map for language {language!r}; falling back to 'en'",
+            file=sys.stderr,
+        )
+        _WARNED_LANGUAGES.add(language)
+    return LABELS["en"]
+
+
+def _read_pack_language(packs_root: Path, pack_name: str) -> str | None:
+    """Read `language` from `packs/<pack_name>/index.md` frontmatter. None if unavailable."""
+    index_path = packs_root / pack_name / "index.md"
+    if not index_path.is_file():
+        return None
+    try:
+        post = frontmatter.load(index_path)
+    except Exception:
+        return None
+    lang = post.metadata.get("language")
+    return str(lang) if lang else None
 
 
 # ---------------------------------------------------------------------------
@@ -90,24 +181,26 @@ def load_save(save_dir: Path) -> Save:
 
 
 # ---------------------------------------------------------------------------
-# Rendering (ported from sirengm/save/render.py)
+# Rendering
 # ---------------------------------------------------------------------------
 
-def render_all(save_dir: Path, save: Save) -> None:
+def render_all(save_dir: Path, save: Save, *, language: str | None) -> None:
+    L = _labels_for(language)
     save_dir.mkdir(parents=True, exist_ok=True)
-    (save_dir / "current_scene.md").write_text(render_current_scene(save), encoding="utf-8")
-    (save_dir / "player.md").write_text(render_player_md(save), encoding="utf-8")
-    session_md, session_jsonl = render_session_log(save)
+    (save_dir / "current_scene.md").write_text(render_current_scene(save, L), encoding="utf-8")
+    (save_dir / "player.md").write_text(render_player_md(save, L), encoding="utf-8")
+    session_md, session_jsonl = render_session_log(save, L)
     (save_dir / "session_log.md").write_text(session_md, encoding="utf-8")
     (save_dir / "session_log.jsonl").write_text(session_jsonl, encoding="utf-8")
     hidden = save.hidden_truths.strip()
+    hidden_body = hidden if hidden else L["hidden_truths_empty"]
     (save_dir / "hidden_truths.md").write_text(
-        ("# Hidden Truths\n\n" + hidden + "\n") if hidden else "# Hidden Truths\n\n(empty)\n",
+        f"# {L['hidden_truths']}\n\n{hidden_body}\n",
         encoding="utf-8",
     )
 
 
-def render_current_scene(save: Save) -> str:
+def render_current_scene(save: Save, L: dict[str, str]) -> str:
     w = save.world
     lines: list[str] = [
         "---",
@@ -118,67 +211,73 @@ def render_current_scene(save: Save) -> str:
         f"risk_level: {w.risk_level}",
         "---",
         "",
-        "# Current Scene",
+        f"# {L['current_scene']}",
         "",
-        f"- **Turn**: {w.turn} · Day {w.day} · {w.time_of_day}",
-        f"- **Location**: `{w.current_location}`",
-        f"- **Risk**: {w.risk_level}",
+        f"- **{L['turn']}**: {w.turn} · {L['day']} {w.day} · {w.time_of_day}",
+        f"- **{L['location']}**: `{w.current_location}`",
+        f"- **{L['risk']}**: {w.risk_level}",
     ]
     if w.present_entities:
-        lines.append("- **Present**: " + ", ".join(f"`{s}`" for s in w.present_entities))
+        lines.append(f"- **{L['present']}**: " + ", ".join(f"`{s}`" for s in w.present_entities))
     if w.active_threads:
-        lines.append("- **Active threads**:")
+        lines.append(f"- **{L['active_threads']}**:")
         for t in w.active_threads:
             lines.append(f"  - `{t.id}` · {t.title} ({t.priority})")
     if w.current_objectives:
-        lines.append("- **Objectives**:")
+        lines.append(f"- **{L['objectives']}**:")
         for o in w.current_objectives:
             lines.append(f"  - {o}")
     if save.session_log:
         last = save.session_log[-1]
-        lines += ["", "## Last narration", "", last.narration.strip(), ""]
+        lines += ["", f"## {L['last_narration']}", "", last.narration.strip(), ""]
     else:
-        lines += ["", "_(no narration yet)_", ""]
+        lines += ["", f"_{L['no_narration']}_", ""]
     return "\n".join(lines) + "\n"
 
 
-def render_player_md(save: Save) -> str:
+def render_player_md(save: Save, L: dict[str, str]) -> str:
     p = save.world.player
-    lines = [
+    fm_lines = [
         "---",
         f"slug: {p.slug}",
         f"name: {p.name}",
-        f"cultivation_stage: {p.cultivation_stage}",
         f"status: {p.status}",
     ]
-    if p.sect:
-        lines.append(f"sect: {p.sect}")
-    lines += ["---", "", f"# {p.name}", ""]
-    lines.append(f"- 修为：**{p.cultivation_stage}**")
-    lines.append(f"- 状态：{p.status}")
-    if p.sect:
-        lines.append(f"- 宗门：{p.sect}")
+    if p.progression:
+        fm_lines.append(f"progression: {p.progression}")
+    if p.affiliation:
+        fm_lines.append(f"affiliation: {p.affiliation}")
+    fm_lines += ["---", "", f"# {p.name}", ""]
+
+    body: list[str] = []
+    if p.progression:
+        body.append(f"- {L['player_progression']}：**{p.progression}**")
+    body.append(f"- {L['player_status']}：{p.status}")
+    if p.affiliation:
+        body.append(f"- {L['player_affiliation']}：{p.affiliation}")
     if p.titles:
-        lines.append(f"- 称号：{', '.join(p.titles)}")
+        body.append(f"- {L['player_titles']}：{', '.join(p.titles)}")
+    for key, value in p.stats.items():
+        body.append(f"- {key}：{value}")
     if p.inventory:
-        lines.append("- 物品：")
+        body.append(f"- {L['player_inventory']}：")
         for item in p.inventory:
             note = f" — {item.notes}" if item.notes else ""
-            lines.append(f"  - {item.name} (`{item.slug}`){note}")
-    return "\n".join(lines) + "\n"
+            body.append(f"  - {item.name} (`{item.slug}`){note}")
+    return "\n".join(fm_lines + body) + "\n"
 
 
-def render_session_log(save: Save) -> tuple[str, str]:
+def render_session_log(save: Save, L: dict[str, str]) -> tuple[str, str]:
     """Return (markdown, jsonl) for the session log.
 
     The jsonl is the canonical re-loadable form; the markdown is human-readable.
     """
-    md_lines = ["# Session Log", ""]
+    md_lines = [f"# {L['session_log']}", ""]
     jsonl_lines: list[str] = []
     for entry in save.session_log:
-        md_lines.append(f"## turn {entry.turn} · {entry.at.isoformat(timespec='seconds')}")
+        md_lines.append(f"## {L['turn_label']} {entry.turn} · {entry.at.isoformat(timespec='seconds')}")
         md_lines.append("")
-        md_lines.append("**玩家**: " + entry.player_input.strip())
+        md_lines.append(f"**{L['player_input']}**: " + entry.player_input.strip())
         md_lines.append("")
         md_lines.append(entry.narration.strip())
         if entry.summary:
@@ -202,15 +301,17 @@ def _entry_to_json(entry: SessionLogEntry) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Re-render markdown surfaces of a save from its JSON state.")
-    p.add_argument("--save", required=True, help="save id under saves/")
+    p.add_argument("--save", required=True, help="path under saves/, typically <pack>/<save_id>")
     p.add_argument("--saves-root", type=Path, default=Path("saves"))
+    p.add_argument("--packs-root", type=Path, default=Path("packs"))
     args = p.parse_args(argv)
     save_dir = args.saves_root / args.save
     if not save_dir.is_dir():
         print(f"error: save dir not found: {save_dir}", file=sys.stderr)
         return 2
     save = load_save(save_dir)
-    render_all(save_dir, save)
+    language = _read_pack_language(args.packs_root, save.pack_name)
+    render_all(save_dir, save, language=language)
     print(f"re-rendered markdown surfaces for {save_dir}")
     return 0
 

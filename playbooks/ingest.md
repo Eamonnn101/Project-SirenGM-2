@@ -1,105 +1,212 @@
 # Playbook · ingest
 
-Compile a novel into a user pack. Invoked when the user says something like
-"ingest `raw/novel/<file>.txt` as pack `<name>` with genre xianxia."
+Compile one or more novels into user packs.
 
-**Preconditions:**
-- `raw/novel/<file>.txt` exists and is utf-8.
-- `genre_packs/<genre>/` exists and lints clean.
-- `packs/<name>/` does not exist yet, or the user has explicitly agreed to
-  overwrite / resume.
+## Invocation forms
 
-**Layers touched:** creates `packs/<name>/`; reads `raw/novel/<file>.txt`
-and `genre_packs/<genre>/**`; never writes `raw/`.
+The user can invoke ingest in either a batch or explicit form.
+
+### Batch — preferred
+
+> "Ingest `raw/novel/` as pack."
+
+The agent scans `raw/novel/` and compiles **every eligible source** into
+its own pack, auto-naming each from the filename.
+
+Eligible sources = top-level files in `raw/novel/`, excluding
+`README.md` and any file starting with `.`. Subdirectories are not
+recursed — combine multi-file novels into a single text file first.
+
+Pack-slug derivation from the filename stem:
+
+- Lowercase; replace spaces, punctuation, and separators with `_`;
+  keep only ASCII `[a-z0-9_]`; collapse runs of `_`; strip leading /
+  trailing `_`.
+- Example: `My Cool Book.txt` → `my_cool_book`.
+- Example: `Book-II (final).md` → `book_ii_final`.
+- If the stem is **entirely non-ASCII** (e.g. `凡人修仙传.txt`), the
+  agent proposes an ASCII slug (transliterated if possible) and asks
+  the user to confirm or override before proceeding.
+
+Skip rule: if `packs/<slug>/` already exists, **skip it** and report
+"already ingested". Re-ingest only when the user explicitly says so
+(e.g. "re-ingest `<slug>`") — re-ingest wipes `packs/<slug>/` first
+(except any `novel_rules.md` the user has hand-edited; if that file
+has mtime newer than `index.md`, the agent asks before overwriting).
+
+### Explicit — still supported
+
+> "Ingest `raw/novel/<file>.txt` as pack `<name>`."
+
+Compile a single novel into a named pack. The user may optionally pin
+the language ("…as pack `<name>` in English"); otherwise the agent
+auto-detects it during Stage 0.
 
 ---
 
-## Stage 1 · chunk
+## Per-novel pipeline
 
-Split the novel into chapter-sized chunks. Prefer the deterministic helper:
+For each eligible novel (one in explicit mode; each file in batch
+mode), run Stages 0–5 in order. In batch mode, process novels one
+at a time; do **not** parallelize. Stage 0's stop-and-summarize
+happens per novel so the user can course-correct before committing
+to the rest of the pipeline on that file.
+
+**Preconditions per novel:**
+- The source file exists and is UTF-8.
+- `genre_packs/universal/` exists and lints clean.
+- `packs/<slug>/` does not exist (or the user authorized re-ingest).
+
+**Layers touched:** creates `packs/<slug>/`; reads `raw/novel/<file>`
+and `genre_packs/universal/**`; never writes `raw/`.
+
+### Stage 0 · Sample and synthesize
+
+Read the first ~20–40 KB of the novel (roughly one to three chapters).
+Then, in this order, write:
+
+1. `packs/<slug>/index.md` with frontmatter:
+   ```yaml
+   name: <slug>
+   kind: user
+   inherits_genre: universal
+   language: <detected_code>   # zh, en, ja, ko, fr, etc.
+   ```
+   If the user passed an explicit language override at invocation, use
+   that instead of the detection. If the novel contains substantial
+   mixed-language content, pick the dominant one and note the mix in
+   `novel_rules.md`.
+
+2. `packs/<slug>/novel_rules.md` — the load-bearing novel-specific
+   rulebook, **in the pack's declared language**. Sections:
+   - Power / skill / cultivation system (or "none — mundane setting").
+   - Social order (factions, ranks, honorifics, taboos).
+   - Technology and era baseline.
+   - Tone and register.
+   - Hard canon (resurrection, time travel, cross-world — on/off).
+   - Naming conventions.
+
+   Keep it tight — the GM reads it on every turn.
+
+3. `packs/<slug>/canon_guardrails.md` — may be a stub at this stage
+   (a heading plus "no novel-specific overrides yet"); Stage 4 may
+   refine it.
+
+Stop after Stage 0 and summarize what you synthesized so the user can
+correct any misread of the setting before committing to full ingest.
+In batch mode, summarize and confirm per novel; do not proceed to
+Stage 1 for any pack until the user green-lights that pack's Stage 0.
+
+### Stage 1 · chunk
+
+Split the novel into chapter-sized chunks with the deterministic helper:
 
 ```bash
-python tools/chunker.py raw/novel/<file>.txt --pack <name>
+python tools/chunker.py raw/novel/<file> --pack <slug>
 ```
 
-This writes `packs/<name>/.ingest/chunks.jsonl`. Verify line count is sane
-(a 200k-char novel should yield roughly 20–80 chunks). If the novel is
-short (<5 chapters) or has no chapter markers, the chunker falls back to
-~3000-char paragraph-boundary chunks.
+This writes `packs/<slug>/.ingest/chunks.jsonl`. Verify line count is
+sane (a 200k-char novel should yield roughly 20–80 chunks). If the
+novel is short (<5 chapters) or has no chapter markers, the chunker
+falls back to ~3000-char paragraph-boundary chunks.
 
-## Stage 2 · extract
+### Stage 2 · extract
 
-Read `genre_packs/<genre>/prompts/ingest_extract_system.md` once. Then
-iterate `chunks.jsonl` chunk by chunk.
+Read `genre_packs/universal/prompts/ingest_extract_system.md` once.
+Note the pack's `language` (from `packs/<slug>/index.md`) and the
+synthesized `novel_rules.md` so extraction uses terminology the novel
+actually uses. Then iterate `chunks.jsonl` chunk by chunk.
 
-For each chunk, produce zero or more JSON objects describing mentions of
-`character`, `faction`, `location`, `system_item`, `event`, `relationship`
-found in the chunk. Append each as one JSON line to
-`packs/<name>/.ingest/mentions.jsonl`. Include `source_chunk: <id>` and a
-short `evidence` quote (≤60 chars) on every mention.
+For each chunk, produce zero or more JSON objects describing mentions
+of `character`, `faction`, `location`, `system_item`, `event`,
+`relationship` found in the chunk. Append each as one JSON line to
+`packs/<slug>/.ingest/mentions.jsonl`. Include `source_chunk: <id>` and
+a short `evidence` quote (≤60 chars, verbatim from the source) on
+every mention.
 
-Guardrails: never fabricate entities that do not appear in the chunk; keep
-slugs stable across chunks (same entity → same slug). If you're uncertain
-whether two mentions refer to the same entity, emit them as separate slugs
-and let Stage 4 (index) record the ambiguity.
+Guardrails: never fabricate entities that do not appear in the chunk;
+keep slugs stable across chunks (same entity → same slug); slugs are
+always ASCII snake_case (romanize for non-Latin languages). If you're
+uncertain whether two mentions refer to the same entity, emit them as
+separate slugs and let Stage 4 (index) record the ambiguity.
 
-Resumability: Stage 2 is append-only per chunk. If interrupted, inspect the
-highest `source_chunk` in `mentions.jsonl` and resume from the next chunk.
+Resumability: Stage 2 is append-only per chunk. If interrupted,
+inspect the highest `source_chunk` in `mentions.jsonl` and resume from
+the next chunk.
 
-## Stage 3 · draft
+### Stage 3 · draft
 
-Read `genre_packs/<genre>/prompts/ingest_draft_system.md` once. Read the
-per-kind schemas under `genre_packs/<genre>/schemas/*.schema.md`.
+Read `genre_packs/universal/prompts/ingest_draft_system.md` once. Read
+the per-kind schemas under `genre_packs/universal/schemas/*.schema.md`.
+Re-read `packs/<slug>/novel_rules.md` — every drafted page must be
+consistent with it.
 
-Group `mentions.jsonl` by `(kind, slug)`. For each group, draft a single
-schema-valid page at `packs/<name>/<kind_plural>/<slug>.md`. Kinds and
-their directories:
+If Stage 0's `novel_rules.md` turned out to be incomplete or wrong
+based on later chunks, revise it here and note the change in
+`packs/<slug>/contradictions/ambiguous_points.md`.
+
+Group `mentions.jsonl` by `(kind, slug)`. For each group, draft a
+single schema-valid page at `packs/<slug>/<kind_plural>/<slug>.md`,
+with body content **in the pack's declared language**. Kinds and their
+directories:
 
 | kind | dir |
 |---|---|
-| character | `packs/<name>/characters/` |
-| faction | `packs/<name>/factions/` |
-| location | `packs/<name>/locations/` |
-| arc | `packs/<name>/arcs/` |
-| event | `packs/<name>/events/` |
-| system_item | `packs/<name>/systems/` (optional) — create a page **only** if other pack pages reference the item as `[[slug]]` (e.g. a named artifact or signature herb); otherwise the mention is absorbed into the referring page's body and discarded. Genre-level mechanics (境界阶梯、社交礼仪) stay under `genre_packs/<genre>/systems/` and must not be duplicated into the user pack. |
+| character | `packs/<slug>/characters/` |
+| faction | `packs/<slug>/factions/` |
+| location | `packs/<slug>/locations/` |
+| arc | `packs/<slug>/arcs/` (default new arcs to `flexibility: soft`) |
+| event | `packs/<slug>/events/` (omit `can_skip` unless overriding the kind's default — `intended`/`triggerable` → `true`, `player_boundary` → `false`) |
+| system_item | `packs/<slug>/systems/` (optional) — create a page **only** if other pack pages reference the item as `[[slug]]` (e.g. a named artifact or signature herb); otherwise the mention is absorbed into the referring page's body and discarded. Novel-level mechanical rules stay in `packs/<slug>/novel_rules.md` — do not duplicate them into per-entity pages. |
 
-Every page has YAML frontmatter matching its schema and a short markdown
-body synthesized from the mentions.
+Every page has YAML frontmatter matching its schema and a short
+markdown body synthesized from the mentions.
 
 Guardrails:
 - No numeric combat stats. Use qualitative language.
 - Cross-references to other entities must use `[[slug]]` syntax.
-- If mentions conflict, prefer the latest chunk and record the older claim
-  under `packs/<name>/contradictions/ambiguous_points.md` (append-only).
+- If mentions conflict, prefer the latest chunk and record the older
+  claim under `packs/<slug>/contradictions/ambiguous_points.md`
+  (append-only).
 
-## Stage 4 · index
+### Stage 4 · index
 
-Write (or regenerate) three files:
+Ensure the following files exist and are coherent (overwrite if
+rerunning):
 
-- `packs/<name>/index.md` — frontmatter `name: <name>`, `kind: user`,
-  `inherits_genre: <genre>`; body links every page by category.
-- `packs/<name>/relationships/relationship_matrix.md` — bullet list of
+- `packs/<slug>/index.md` — frontmatter `name`, `kind: user`,
+  `inherits_genre: universal`, `language: <code>`; body links every
+  page by category.
+- `packs/<slug>/relationships/relationship_matrix.md` — bullet list of
   relationship mentions grouped by `from` slug.
-- `packs/<name>/contradictions/ambiguous_points.md` — any ambiguities you
-  logged during draft.
-- `packs/<name>/timeline.md` — chronological list of events with their
+- `packs/<slug>/contradictions/ambiguous_points.md` — any ambiguities
+  you logged during draft.
+- `packs/<slug>/timeline.md` — chronological list of events with their
   chunk provenance.
-- `packs/<name>/canon_guardrails.md` — novel-specific overrides on top of
-  the genre guardrails (may be empty but must exist with a heading).
-- `packs/<name>/overview.md` — 200–400 word synopsis.
+- `packs/<slug>/canon_guardrails.md` — novel-specific overrides on top
+  of the universal guardrails (may be empty but must exist with a
+  heading).
+- `packs/<slug>/novel_rules.md` — finalized per-novel ruleset (written
+  in Stage 0, refined here if late chunks forced changes).
+- `packs/<slug>/overview.md` — 200–400 word synopsis in the pack's
+  language.
 
-## Stage 5 · lint
+### Stage 5 · lint
 
 ```bash
-python tools/lint_pack.py --pack <name>
+python tools/lint_pack.py --pack <slug>
 ```
 
-If issues are reported, loop back to Stage 3 for the affected pages. Do
-NOT proceed to `playbooks/new-game.md` until lint is clean.
+If issues are reported, loop back to Stage 3 for the affected pages.
+Do NOT proceed to `playbooks/new-game.md` until lint is clean.
 
 ## What to tell the user at the end
 
-Report: chunk count, mention count, page counts per kind, lint status,
-and one-paragraph summary of the overall synopsis. Do NOT start a game
-yet — wait for the user to invoke `playbooks/new-game.md`.
+Per pack, report: detected/declared language, chunk count, mention
+count, page counts per kind, lint status, and a one-paragraph overall
+synopsis.
+
+In batch mode, also report a summary table at the end listing each
+source file, its derived slug, and the outcome (`ingested`, `skipped
+(exists)`, `failed lint`, etc.). Do NOT start a game yet — wait for
+the user to invoke `playbooks/new-game.md`.

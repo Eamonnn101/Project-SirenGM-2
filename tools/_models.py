@@ -1,8 +1,8 @@
 """Canonical Pydantic schemas for SirenGM 2 save state and pack entities.
 
-Kept in sync with the shapes the agent writes under saves/<id>/ and
-packs/<name>/. Imported by tools/lint_pack.py, tools/render_save.py,
-tools/inspect_save.py.
+Kept in sync with the shapes the agent writes under
+saves/<pack>/<save_id>/ and packs/<pack>/. Imported by
+tools/lint_pack.py, tools/render_save.py, tools/inspect_save.py.
 """
 
 from __future__ import annotations
@@ -38,11 +38,18 @@ class PlayerState(BaseModel):
 
     slug: str = Field(..., description="Matches the protagonist entity slug in the user pack.")
     name: str
-    sect: str | None = None
-    cultivation_stage: str = "气感期一层"
+    affiliation: str | None = Field(default=None, description="Slug of an affiliated faction, if any.")
+    progression: str | None = Field(
+        default=None,
+        description="Free-form progression label, e.g. '筑基中期', 'Lieutenant', 'Level 12 Ranger'.",
+    )
     status: Literal["alive", "injured", "unconscious", "dead", "missing", "unknown"] = "alive"
     inventory: list[InventoryItem] = Field(default_factory=list)
     titles: list[str] = Field(default_factory=list)
+    stats: dict[str, str] = Field(
+        default_factory=dict,
+        description="Novel-specific attributes the renderer surfaces verbatim.",
+    )
 
 
 class ActiveThread(BaseModel):
@@ -177,9 +184,12 @@ class PageBase(BaseModel):
 class CharacterPage(PageBase):
     category: Literal["character"] = "character"
     aliases: list[str] = Field(default_factory=list)
-    role: str | None = Field(default=None, description="Free-form role label: protagonist, master, rival, ...")
-    sect: str | None = Field(default=None, description="Slug of affiliated faction, if any.")
-    cultivation_stage: str | None = None
+    role: str | None = Field(default=None, description="Free-form role label: protagonist, mentor, rival, ...")
+    affiliation: str | None = Field(default=None, description="Slug of an affiliated faction, if any.")
+    progression: str | None = Field(
+        default=None,
+        description="Free-form progression label whose space is defined in the novel's novel_rules.md.",
+    )
     status: Literal["alive", "injured", "unconscious", "dead", "missing", "unknown"] = "alive"
     location: str | None = Field(default=None, description="Slug of a location page, if resident.")
 
@@ -208,12 +218,29 @@ class ArcPage(PageBase):
     summary: str = ""
     status: Literal["opening", "active", "suspended", "closed"] = "opening"
     driving_entities: list[str] = Field(default_factory=list)
+    flexibility: Literal["soft", "hard"] = Field(
+        default="soft",
+        description="'soft' arcs may be sidelined by player agency; 'hard' arcs are canon.",
+    )
 
 
 class EventPage(PageBase):
     category: Literal["event"] = "event"
-    kind: Literal["key", "triggerable", "dangerous_divergence"] = "key"
+    kind: Literal["intended", "triggerable", "player_boundary"] = "intended"
     preconditions: list[str] = Field(default_factory=list)
+    can_skip: bool | None = Field(
+        default=None,
+        description=(
+            "Skippability override. When omitted, defaults by kind: True for "
+            "intended/triggerable, False for player_boundary. Set explicitly to override."
+        ),
+    )
+
+    @model_validator(mode="after")
+    def _default_can_skip_by_kind(self) -> "EventPage":
+        if self.can_skip is None:
+            self.can_skip = self.kind != "player_boundary"
+        return self
 
 
 class MetaPage(BaseModel):
@@ -226,15 +253,19 @@ class MetaPage(BaseModel):
 
 
 class Pack(BaseModel):
-    """A fully loaded Story Pack (either a genre template or a user pack)."""
+    """A fully loaded Story Pack (either the universal genre template or a user pack)."""
 
     model_config = ConfigDict(extra="forbid")
 
     name: str = Field(..., description="Pack directory name.")
-    kind: PackKind = Field(..., description="'genre' for reusable templates; 'user' for novel-generated packs.")
+    kind: PackKind = Field(..., description="'genre' for the shipped universal template; 'user' for novel-generated packs.")
     inherits_genre: str | None = Field(
         default=None,
-        description="Required for user packs: the genre pack name to stack against. Must be None for genre packs.",
+        description="Required for user packs (typically 'universal'). Must be None for genre packs.",
+    )
+    language: str | None = Field(
+        default=None,
+        description="BCP-47-ish language code (e.g. 'zh', 'en', 'ja'). Required on user packs; may be None on genre packs.",
     )
 
     # Top-level meta pages
@@ -259,7 +290,9 @@ class Pack(BaseModel):
         if self.kind == "genre":
             if self.inherits_genre is not None:
                 raise ValueError("genre packs must not declare inherits_genre")
-            # Systems are genre-level mechanics (cultivation, social_rules) and are permitted.
+            # The universal genre pack is language-agnostic by design; per-novel
+            # language lives on user packs.
+            # Systems are optional genre-level mechanics and are permitted.
             # Characters, factions, locations, arcs, events are novel-specific and forbidden.
             if any((self.characters, self.factions, self.locations, self.arcs, self.events)):
                 raise ValueError(
@@ -270,6 +303,8 @@ class Pack(BaseModel):
         else:  # user
             if not self.inherits_genre:
                 raise ValueError("user packs must declare inherits_genre in their index.md frontmatter")
+            if not self.language:
+                raise ValueError("user packs must declare language in their index.md frontmatter")
         return self
 
     def find_entity(self, slug: str) -> PageBase | None:
