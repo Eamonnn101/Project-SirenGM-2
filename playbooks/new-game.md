@@ -10,8 +10,13 @@ All three forms land in the same pipeline. The agent fills in whatever
 the user left implicit.
 
 - **Bare** — "start a new game" / "开始游戏"
-  - If exactly one pack exists under `packs/`, use it.
-  - If multiple packs exist, list them and ask which to play.
+  - Enumerate packs: count only non-hidden subdirectories of `packs/`
+    that contain an `index.md` with `kind: user`. Files at the top
+    level (`packs/.gitkeep`, stray notes), hidden dirs (`.obsidian/`,
+    `.cache/`), and half-written directories without `index.md` are
+    **not** packs and must not be counted.
+  - If exactly one such pack exists, use it.
+  - If multiple exist, list them and ask which to play.
   - If none exist, tell the user to run `playbooks/ingest.md` first.
   - Auto-assign `<save_id>` (see below).
 - **Pack explicit** — "start a new game against pack `<name>`"

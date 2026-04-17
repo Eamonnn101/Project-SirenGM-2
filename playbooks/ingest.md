@@ -10,14 +10,30 @@ The user can invoke ingest in either a batch or explicit form.
 
 > "Ingest `raw/novel/` as pack."
 
-The agent scans `raw/novel/` and compiles **every eligible source** into
-its own pack, auto-naming each from the filename.
+The agent scans `raw/novel/` and compiles **every eligible source**
+into its own pack, auto-naming each from the filename.
 
-Eligible sources = top-level files in `raw/novel/`, excluding
-`README.md` and any file starting with `.`. Subdirectories are not
-recursed — combine multi-file novels into a single text file first.
+### Eligibility filter
 
-Pack-slug derivation from the filename stem:
+Include only top-level files in `raw/novel/` that all of:
+
+- have a case-insensitive extension of `.txt` or `.md`,
+- are UTF-8 decodable (spot-check the first few KB; skip on
+  `UnicodeDecodeError`),
+- are not `README.md`, and
+- do not start with `.`.
+
+Subdirectories are not recursed — combine multi-file novels into a
+single text file first.
+
+Any file skipped by this filter is reported in the pre-scan summary
+(see "Pre-scan" below) with a short reason, e.g. `skipped: unsupported
+extension .pdf — convert to .txt/.md first`. Unsupported sources are
+never passed to Stage 0.
+
+### Pack-slug derivation
+
+From the filename stem:
 
 - Lowercase; replace spaces, punctuation, and separators with `_`;
   keep only ASCII `[a-z0-9_]`; collapse runs of `_`; strip leading /
@@ -28,11 +44,42 @@ Pack-slug derivation from the filename stem:
   agent proposes an ASCII slug (transliterated if possible) and asks
   the user to confirm or override before proceeding.
 
-Skip rule: if `packs/<slug>/` already exists, **skip it** and report
-"already ingested". Re-ingest only when the user explicitly says so
-(e.g. "re-ingest `<slug>`") — re-ingest wipes `packs/<slug>/` first
-(except any `novel_rules.md` the user has hand-edited; if that file
-has mtime newer than `index.md`, the agent asks before overwriting).
+### Pre-scan (before any ingest starts)
+
+In batch mode, compute the slug for every eligible source first and
+build a `source → slug` map. Then:
+
+1. **In-batch collisions.** If two distinct sources map to the same
+   slug (e.g. `My Book.txt` and `my-book.md` both → `my_book`, or two
+   non-ASCII titles transliterate to the same ASCII slug), **stop
+   before Stage 0** and report the collision. Ask the user to rename
+   one of the files or supply an explicit alternate slug for one of
+   them. Do not auto-resolve by suffixing `_2`, `_3`, … — silent
+   disambiguation hides a user decision.
+2. **Existing-pack skips.** If `packs/<slug>/` already exists,
+   **do not assume it came from the same source**. If the pack's
+   `index.md` records a `source_file` that equals the current
+   filename, treat it as a legitimate skip and report `already
+   ingested from <source_file>`. If `source_file` is missing or
+   differs, stop and ask the user whether this is the same novel
+   (skip), a collision (rename / alternate slug), or a re-ingest.
+
+Print the pre-scan summary (one line per source: filename → slug →
+action) and wait for the user to confirm before Stage 0 runs on
+anything.
+
+### Re-ingest
+
+Invoked only when the user explicitly says so (e.g. "re-ingest
+`<slug>`"). Re-ingest wipes `packs/<slug>/` first, except any
+`novel_rules.md` the user has hand-edited; if that file has mtime
+newer than `index.md`, the agent asks before overwriting.
+
+### Stage-0 bookkeeping
+
+When Stage 0 writes `packs/<slug>/index.md`, include
+`source_file: <relative path under raw/novel/>` in the frontmatter so
+later batches can tell real collisions from legitimate skips.
 
 ### Explicit — still supported
 
@@ -71,11 +118,14 @@ Then, in this order, write:
    kind: user
    inherits_genre: universal
    language: <detected_code>   # zh, en, ja, ko, fr, etc.
+   source_file: <relative path under raw/novel/>   # e.g. my_novel.txt
    ```
    If the user passed an explicit language override at invocation, use
    that instead of the detection. If the novel contains substantial
    mixed-language content, pick the dominant one and note the mix in
-   `novel_rules.md`.
+   `novel_rules.md`. `source_file` lets later batch runs distinguish
+   "same novel, already ingested" from "different novel, slug
+   collision" (see Pre-scan).
 
 2. `packs/<slug>/novel_rules.md` — the load-bearing novel-specific
    rulebook, **in the pack's declared language**. Sections:

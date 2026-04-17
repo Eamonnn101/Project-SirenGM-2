@@ -25,12 +25,18 @@ Version: **v0.2** — genre-agnostic ingest, pack-scoped saves, localized render
 
 ### Invocation
 
-- **Batch ingest.** `Ingest raw/novel/ as pack` compiles every
-  eligible file under `raw/novel/` into its own pack in one pass. Pack
-  slugs are derived from filenames (`My Cool Book.txt` →
-  `my_cool_book`); packs that already exist are skipped unless you
-  explicitly re-ingest. The single-novel form (`…as pack <name>`) is
-  still accepted.
+- **Batch ingest.** `Ingest raw/novel/ as pack` scans `raw/novel/`,
+  derives a pack slug from each filename (`My Cool Book.txt` →
+  `my_cool_book`), and runs the ingest pipeline on each `.txt` / `.md`
+  source in sequence. The agent first prints a pre-scan (source →
+  slug → action, plus any skipped unsupported files or slug
+  collisions) and waits for confirmation; it then ingests the sources
+  one at a time, with a per-novel Stage-0 checkpoint so you can
+  course-correct before committing to the rest of the pipeline on
+  each book. Already-ingested packs are skipped by matching
+  `source_file` in their `index.md`; silent slug-collapse across two
+  different sources is refused, not auto-resolved. The single-novel
+  form (`…as pack <name>`) is still accepted.
 - **Start game, no id required.** `Start a new game` / "开始游戏" is
   enough: if exactly one pack exists, the agent picks it; otherwise it
   lists the packs and asks. The save id auto-increments
@@ -111,23 +117,29 @@ If narrator prose and structured state disagree, structured state wins.
 ## How to use it
 
 1. Clone this repo and open the folder in Claude Code (or Codex).
-2. Drop one or more novels (any genre, any language) into `raw/novel/`:
+2. Drop one or more novels (any genre, any language) into `raw/novel/`
+   as `.txt` or `.md` files:
    ```bash
    cp my_novel.txt raw/novel/
-   cp another_book.txt raw/novel/
+   cp another_book.md raw/novel/
    ```
-   Each top-level file becomes one pack. Subdirectories aren't
-   recursed — combine multi-file novels into a single text file first.
+   Each top-level text file becomes one pack. Non-text formats (PDF,
+   EPUB, images) are not ingested — convert them to plain text first.
+   Subdirectories aren't recursed — combine multi-file novels into a
+   single text file first.
 3. Tell the agent:
    > "Ingest `raw/novel/` as pack."
 
    The agent reads [`CLAUDE.md`](./CLAUDE.md) and
    [`playbooks/ingest.md`](./playbooks/ingest.md), scans `raw/novel/`,
    derives a pack slug from each filename (e.g. `My Cool Book.txt` →
-   `my_cool_book`), auto-detects each novel's language, synthesizes
-   its `novel_rules.md`, and compiles it into `packs/<slug>/`. Packs
-   that already exist are skipped unless you say "re-ingest". Expect
-   10–60 minutes per novel depending on length.
+   `my_cool_book`), and prints a pre-scan (source → slug → action).
+   After you confirm, it ingests each novel in sequence, auto-detects
+   its language, synthesizes its `novel_rules.md`, and compiles it
+   into `packs/<slug>/` — with a Stage-0 checkpoint per novel so you
+   can catch setting misreads early. Already-ingested packs are
+   detected via `source_file` and skipped unless you say "re-ingest".
+   Expect 10–60 minutes per novel depending on length.
 
    (The single-novel form is still supported:
    > "Ingest `raw/novel/my_novel.txt` as pack `mypack`.")
