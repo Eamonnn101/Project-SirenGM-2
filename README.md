@@ -92,7 +92,10 @@ default.
   scene facts. `active_threads` and `current_objectives` are explicit
   **soft suggestions** — player input wins when it diverges.
 - **Every turn outputs narration + 3 GM options + a free-form slot.**
-  After the 150–400-char prose scene, the GM appends four bullets:
+  After the 300–700-char (zh) / 200–500-word (en) prose scene —
+  budget measured on the narration prose alone, with the options
+  block counted separately — which plays the current beat through to
+  its pivot, not a static tableau, the GM appends four bullets:
   `选项A/B/C` (each with a short tactic label and a diegetic action
   description) and a fixed `选项D（自创脑洞）` that lets the player
   write whatever they want. Options are persisted on

@@ -23,12 +23,18 @@ conflict.
 
 ## Paragraph rhythm
 
-- Keep paragraphs tight. A single narrative beat per paragraph;
-  tense moments can be shorter still.
+- Keep paragraphs tight: one narrative beat per paragraph, tense
+  moments shorter still.
+- A **turn**, however, should move the scene through several beats —
+  typically the player's action landing, each present NPC's distinct
+  reaction, and the complication that reshapes the next choice. A
+  static opening tableau is not a full turn (see
+  `prompts/gm_system_fragment.md` · *Beat density*).
+- "One exchange at a time" means **one player decision per turn**,
+  not one sentence per turn. Do not fast-forward across a second
+  player decision; do play the current decision out to its pivot.
 - Do not end a turn with a summary or recap. No "you have now arrived
   at...", no "with this, the journey begins".
-- Combat, chase, and confrontation unfold one exchange at a time. No
-  fast-forwarding across multiple beats.
 
 ## Sensory grounding
 

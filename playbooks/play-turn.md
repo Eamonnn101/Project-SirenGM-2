@@ -41,10 +41,16 @@ Using the loaded context, produce the turn output **in the pack's
 declared `language`** (from `packs/<name>/index.md`). Every turn
 has two parts:
 
-1. **Narration** — 150–400 characters of prose responding to the
-   user's input. Style follows
+1. **Narration** — 300–700 characters (zh) / 200–500 words (en)
+   of prose responding to the user's input. The budget is the
+   narration prose **only**; the options block is counted separately
+   and does not eat into it. Style follows
    `genre_packs/universal/style_guide.md` plus any novel-level
-   overrides.
+   overrides. Density matters: play the current beat through to its
+   pivot (action → each NPC's distinct reaction → complication);
+   a static tableau is a failure unless the player's input was
+   itself observational. See *Beat density* in
+   `prompts/gm_system_fragment.md`.
 2. **Options block** — exactly three GM-proposed options
    (`选项A/B/C` in zh, `Option A/B/C` in en), each with a short
    tactic label in parentheses and a 60–150 character diegetic

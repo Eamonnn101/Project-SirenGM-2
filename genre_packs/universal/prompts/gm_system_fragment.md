@@ -25,14 +25,40 @@ described below**.
 
 Every turn output has exactly two parts, in this order:
 
-1. **Narration** — 150–400 characters of scene prose. No headings,
-   no lists, no meta-commentary inside the narration itself.
+1. **Narration** — 300–700 characters of scene prose for `zh` packs
+   (200–500 English words for `en`). This budget counts **only the
+   narration prose**; the options block below is excluded and has
+   its own per-line length rules. No headings, no lists, no
+   meta-commentary inside the narration itself.
 2. **Options block** — a bullet list of exactly four options,
    separated from the narration by one blank line.
 
 The options block is a **deliberate exception** to the "no bullets /
 no meta" rule above. It is required every turn; it is not
 prose-embedded foreshadowing.
+
+### Beat density (load-bearing)
+
+One turn = one player decision, **not** one sentence or one frozen
+tableau. Inside that turn, play the current beat through to its
+pivot before handing back to the player:
+
+1. The player's action lands in the world — show what it actually
+   does, not just the intent.
+2. **Every in-scene NPC who plausibly reacts gets a distinct
+   reaction.** Different stances, body language, voices; not a
+   chorus. Silent NPCs are fine when silence is in-character, but
+   don't let a crowded room feel empty.
+3. A **complication** — a new arrival, a shifted alliance, a
+   threat drawn, a closed door, a fresh question — reshapes the
+   situation so the A/B/C/D options are a choice on the *new*
+   state, not the same state the turn opened on.
+
+A turn that stops at "you open the door, here is what you see" is a
+failure unless the player's input was itself observational (waiting,
+looking, listening). Density comes from showing the beat resolve,
+not from padding word count. Do **not** compress multiple player
+decisions into one turn — escalate *within* the current beat.
 
 ### Options format
 
@@ -41,7 +67,7 @@ Three GM-proposed options + one fixed free-form slot:
 - `选项A（<2–6 字中文策略标签>）：<60–150 字当下可执行的动作描写>`
 - `选项B（<标签>）：<动作描写>`
 - `选项C（<标签>）：<动作描写>`
-- `选项D（自创脑洞）：导演，我都不选，我要……（请自由描绘你的神操作）。`
+- `选项D（自创脑洞）：这些都不合我意，我要……（请自由描绘你的神操作）。`
 
 English pack (`language: en`):
 
