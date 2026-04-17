@@ -117,13 +117,13 @@ Then, in this order, write:
    name: <slug>
    kind: user
    inherits_genre: universal
-   language: <detected_code>   # zh, en, ja, ko, fr, etc.
+   language: zh   # must be 'zh' or 'en' — the only two supported
    source_file: <relative path under raw/novel/>   # e.g. my_novel.txt
    ```
    If the user passed an explicit language override at invocation, use
-   that instead of the detection. If the novel contains substantial
-   mixed-language content, pick the dominant one and note the mix in
-   `novel_rules.md`. `source_file` lets later batch runs distinguish
+   that instead of the detection. Only `zh` and `en` are accepted; if
+   the novel is primarily in another language, stop and ask the user
+   to supply a zh/en translation first. `source_file` lets later batch runs distinguish
    "same novel, already ingested" from "different novel, slug
    collision" (see Pre-scan).
 
@@ -176,9 +176,10 @@ every mention.
 
 Guardrails: never fabricate entities that do not appear in the chunk;
 keep slugs stable across chunks (same entity → same slug); slugs are
-always ASCII snake_case (romanize for non-Latin languages). If you're
-uncertain whether two mentions refer to the same entity, emit them as
-separate slugs and let Stage 4 (index) record the ambiguity.
+always ASCII snake_case (for Chinese sources, romanize via pinyin).
+If you're uncertain whether two mentions refer to the same entity,
+emit them as separate slugs and let Stage 4 (index) record the
+ambiguity.
 
 Resumability: Stage 2 is append-only per chunk. If interrupted,
 inspect the highest `source_chunk` in `mentions.jsonl` and resume from
@@ -214,7 +215,16 @@ markdown body synthesized from the mentions.
 
 Guardrails:
 - No numeric combat stats. Use qualitative language.
-- Cross-references to other entities must use `[[slug]]` syntax.
+- Cross-references to other entities use the piped wiki-link dialect
+  `[[slug|Display]]`, where `slug` is the canonical ASCII snake_case
+  id and `Display` is the native-language label the reader sees.
+  Bare `[[slug]]` is only valid when the target entity's `name` is
+  already ASCII; packs whose entities have non-ASCII names **must**
+  always carry a display label (the lint rejects bare slugs pointing
+  at non-ASCII-named entities). See
+  `genre_packs/universal/prompts/ingest_draft_system.md` for the
+  full rule; `python tools/render_pack.py --pack <slug>` rewrites
+  these into plain Markdown links under `packs/<slug>/_rendered/`.
 - If mentions conflict, prefer the latest chunk and record the older
   claim under `packs/<slug>/contradictions/ambiguous_points.md`
   (append-only).
@@ -249,6 +259,16 @@ python tools/lint_pack.py --pack <slug>
 
 If issues are reported, loop back to Stage 3 for the affected pages.
 Do NOT proceed to `playbooks/new-game.md` until lint is clean.
+
+Optionally, render the pack's wiki-link cross-references into plain
+Markdown for reading in a non-wikilink editor:
+
+```bash
+python tools/render_pack.py --pack <slug>
+```
+
+This writes expanded copies under `packs/<slug>/_rendered/` (the
+canonical sources keep the `[[slug|Display]]` form).
 
 ## What to tell the user at the end
 

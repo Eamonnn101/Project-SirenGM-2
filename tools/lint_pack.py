@@ -49,7 +49,11 @@ else:
     )
 
 
-_LINK_PATTERN = re.compile(r"\[\[([a-zA-Z0-9_]+)\]\]")
+_LINK_PATTERN = re.compile(r"\[\[([a-zA-Z0-9_]+)(?:\|([^\]|]+))?\]\]")
+
+
+def _has_non_ascii(s: str) -> bool:
+    return any(ord(ch) > 127 for ch in s)
 
 # Entity subdirectories.
 _ENTITY_MODEL: dict[str, type[PageBase]] = {
@@ -244,22 +248,42 @@ def _lint_user(pack, pack_dir: Path, *, genre_packs_root: Path | None) -> list[s
                 issues.append(f"arc {arc.slug!r} lists unknown driving_entity {ent!r}")
 
     # [[wiki-links]] resolution: every link in any body should match an entity slug.
-    all_slugs = character_slugs | faction_slugs | location_slugs | {s.slug for s in pack.systems} | {a.slug for a in pack.arcs} | {e.slug for e in pack.events}
-    issues.extend(_scan_wiki_links(pack_dir, all_slugs))
+    # We also build a slug → display-name map so we can require a |Display label
+    # on references to entities whose canonical name contains non-ASCII characters
+    # (otherwise a bare [[xiao_yan]] shows up as unreadable pinyin in prose).
+    slug_to_name: dict[str, str] = {}
+    for bucket in (pack.characters, pack.factions, pack.locations, pack.systems, pack.arcs, pack.events):
+        for page in bucket:
+            slug_to_name[page.slug] = page.name
+    issues.extend(_scan_wiki_links(pack_dir, slug_to_name))
     return issues
 
 
-def _scan_wiki_links(pack_dir: Path, known_slugs: set[str]) -> list[str]:
+def _scan_wiki_links(pack_dir: Path, slug_to_name: dict[str, str]) -> list[str]:
     issues: list[str] = []
+    known_slugs = set(slug_to_name)
     for md in pack_dir.rglob("*.md"):
-        if ".ingest" in md.parts:
+        if ".ingest" in md.parts or "_rendered" in md.parts:
             continue
         text = md.read_text(encoding="utf-8")
+        rel = md.relative_to(pack_dir)
         for m in _LINK_PATTERN.finditer(text):
             slug = m.group(1)
+            display = m.group(2)
             if slug not in known_slugs:
-                rel = md.relative_to(pack_dir)
-                issues.append(f"{rel}: [[{slug}]] does not resolve to any entity slug")
+                raw = m.group(0)
+                issues.append(f"{rel}: {raw} does not resolve to any entity slug")
+                continue
+            name = slug_to_name[slug]
+            # If the canonical entity name is non-ASCII (e.g. 萧炎), a bare
+            # [[slug]] is unreadable in plain Markdown — require the piped
+            # [[slug|Display]] form.
+            if display is None and _has_non_ascii(name):
+                issues.append(
+                    f"{rel}: [[{slug}]] references entity with non-ASCII name "
+                    f"{name!r}; use [[{slug}|{name}]] so the pack reads in its "
+                    "declared language"
+                )
     return issues
 
 

@@ -92,7 +92,26 @@ and a short note.
 
 ### Cross-references
 
-Any reference to another entity uses `[[slug]]` inline. Do not
+Canonical ids and display labels are separate concerns. Slugs are
+always ASCII snake_case (romanized for non-Latin novels); display
+labels are the native-language name the player reads.
+
+Use the piped wiki-link dialect:
+
+- `[[slug|Display]]` — explicit display label. **Required** in every
+  Chinese pack (the target entity's `name` is Chinese, so the slug
+  alone would surface as unreadable pinyin). Pick `Display` from the
+  target's `name` or one of its `aliases` — whichever reads most
+  naturally in the current sentence.
+- `[[slug]]` — bare form. **Only** acceptable when the target
+  entity's `name` is ASCII (typical in English packs). Never emit
+  bare `[[xiao_yan]]`.
+
+The slug is what the lint and renderer resolve; the display label
+is what the player reads. `tools/lint_pack.py` rejects bare slugs
+that point at non-ASCII-named entities, and
+`tools/render_pack.py` rewrites `[[slug|Display]]` into
+`[Display](<relative path>)` for plain-Markdown readers. Do not
 hyperlink to URLs or external docs.
 
 ## Anti-patterns

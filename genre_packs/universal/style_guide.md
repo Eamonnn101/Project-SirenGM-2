@@ -39,8 +39,9 @@ conflict.
 
 ## Language and register
 
-- Narrate in the pack's declared `language` (zh, en, ja, etc.). Do not
-  mix languages in the same paragraph unless the novel itself does.
+- Narrate in the pack's declared `language` (`zh` or `en` — the only
+  two supported). Do not mix languages in the same paragraph unless
+  the novel itself does.
 - Match the novel's register (classical, modern colloquial, courtly,
   gutter, etc.) as described in `novel_rules.md`. When in doubt, lean
   on the tone of the novel's own prose.
@@ -52,11 +53,18 @@ conflict.
 
 ## Options and hints
 
-- Only hint at player choices when the scene genuinely offers a fork.
-  Even then, embed the hint as a world detail (a flickering lamp, a
-  muffled voice behind a door), never as a meta list.
-- Never write "you can choose A/B/C". The world presents, the player
-  decides.
+Two scopes — do not confuse them:
+
+- **Inside the narration prose:** never write "you can choose
+  A/B/C", never break out a bullet list, never do meta-commentary.
+  If the scene implies a fork, embed the hint as a world detail (a
+  flickering lamp, a muffled voice behind a door). The prose is
+  fiction, not a menu.
+- **After the narration, as the turn's options block:** the GM is
+  **required** to append exactly three proposed options (A/B/C)
+  plus the fixed free-form D slot, per
+  `prompts/gm_system_fragment.md`. That block is the one place
+  where an explicit list is allowed and expected.
 
 ## What the GM does NOT produce
 

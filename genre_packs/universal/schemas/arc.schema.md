@@ -37,4 +37,6 @@ Cover: pacing (rough turn intervals if meaningful), key beats,
 success and failure exits, links to other arcs. Keep this short —
 arcs are scaffolding, not scripts.
 
-Cross-references use `[[slug]]`.
+Cross-references use the piped wiki-link dialect `[[slug|Display]]`;
+see `prompts/ingest_draft_system.md`. Bare `[[slug]]` is only valid
+when the target entity's `name` is ASCII.

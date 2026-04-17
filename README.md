@@ -5,10 +5,10 @@
 A file-driven, agent-native MVP that validates:
 
 > An agent (Claude Code or Codex) can compile a user-supplied novel
-> (any genre, any language) into a runnable Story Pack, and then run
-> a coherent 20–50-turn game against that pack with persistent state
-> across save/load — using only file I/O and the agent's own LLM
-> calls, no custom runtime.
+> (any genre; Chinese or English text only) into a runnable Story
+> Pack, and then run a coherent 20–50-turn game against that pack
+> with persistent state across save/load — using only file I/O and
+> the agent's own LLM calls, no custom runtime.
 
 The thesis is **"compile novel → playable world,"** not "play inside a
 prebuilt world." There is no ready-made sample pack — the product path
@@ -19,7 +19,10 @@ immutable, the pack is an LLM-maintained persistent middle layer, and
 runtime reads from the compiled pack + structured save instead of
 re-deriving from raw text on every turn.
 
-Version: **v0.2** — genre-agnostic ingest, pack-scoped saves, localized rendering.
+Version: **v0.3** — every turn now produces narration + three
+GM-proposed action options plus a fixed free-form slot. The pack
+language is constrained to `zh` or `en`; `zh` is the rendering
+default.
 
 ## What's new in v0.2
 
@@ -50,12 +53,21 @@ Version: **v0.2** — genre-agnostic ingest, pack-scoped saves, localized render
   novel-specific judgment (power system, social order, tone, hard
   canon) moves into each user pack's `novel_rules.md`.
 - **Language is a first-class pack field.** User packs declare
-  `language: <code>` in `index.md`. Rendering and lint pick localized
-  labels from a per-language dictionary (English and Simplified
-  Chinese ship; others fall back to English with a stderr warning).
+  `language: zh` or `language: en` in `index.md` (the only two
+  supported values). Rendering picks localized labels from a
+  two-language dictionary; `zh` is the default when the field is
+  missing.
 - **`novel_rules.md` is load-bearing.** The ingest pipeline synthesizes
   it before drafting entities, and `lint_pack.py` now requires it on
   every user pack.
+- **Cross-refs separate canonical id from display label.** Entity
+  pages reference each other with `[[slug|Display]]` — the slug
+  stays ASCII snake_case (stable for tools, schemas, lint); the
+  display label is the native-language name the reader sees (e.g.
+  `[[xiao_yan|萧炎]]`). `lint_pack.py` rejects bare `[[slug]]` when
+  the target entity has a non-ASCII `name`, and
+  `tools/render_pack.py` expands the dialect into plain Markdown
+  links under `packs/<pack>/_rendered/`.
 
 ### Save layer
 
@@ -79,6 +91,13 @@ Version: **v0.2** — genre-agnostic ingest, pack-scoped saves, localized render
   `active_threads` directly; markdown surfaces are never scraped for
   scene facts. `active_threads` and `current_objectives` are explicit
   **soft suggestions** — player input wins when it diverges.
+- **Every turn outputs narration + 3 GM options + a free-form slot.**
+  After the 150–400-char prose scene, the GM appends four bullets:
+  `选项A/B/C` (each with a short tactic label and a diegetic action
+  description) and a fixed `选项D（自创脑洞）` that lets the player
+  write whatever they want. Options are persisted on
+  `SessionLogEntry.options` and re-rendered into `session_log.md`;
+  English packs get the English template.
 - **Event skippability defaults by kind.** `EventPage.can_skip`
   defaults to `False` for `player_boundary` events and `True` for
   `intended` / `triggerable`. Explicit values still override.
@@ -117,8 +136,8 @@ If narrator prose and structured state disagree, structured state wins.
 ## How to use it
 
 1. Clone this repo and open the folder in Claude Code (or Codex).
-2. Drop one or more novels (any genre, any language) into `raw/novel/`
-   as `.txt` or `.md` files:
+2. Drop one or more novels (any genre; Chinese or English only) into
+   `raw/novel/` as `.txt` or `.md` files:
    ```bash
    cp my_novel.txt raw/novel/
    cp another_book.md raw/novel/
@@ -170,9 +189,10 @@ deterministic checks or re-rendering.
 | script | purpose |
 |---|---|
 | `python tools/chunker.py <novel> --pack <pack>` | Split a raw novel into chapter chunks under `packs/<pack>/.ingest/chunks.jsonl`. |
-| `python tools/lint_pack.py --pack <pack>` / `--genre <name>` | Validate a user or genre pack (required files, schemas, cross-refs, orphan wiki-links). |
+| `python tools/lint_pack.py --pack <pack>` / `--genre <name>` | Validate a user or genre pack (required files, schemas, cross-refs, orphan wiki-links, bare slugs on non-ASCII-named entities). |
 | `python tools/lint_save.py --save <pack>/<save_id>` | Validate a save: JSON legality, `turn ≡ len(session_log)`, `player.json ≡ world_state.player`, rendered-surface drift, slug existence. |
 | `python tools/render_save.py --save <pack>/<save_id>` | Re-render markdown surfaces from JSON. Load-bearing: run after every turn. |
+| `python tools/render_pack.py --pack <pack>` | Expand the pack's `[[slug\|Display]]` wiki-links into plain Markdown links under `packs/<pack>/_rendered/` for non-wikilink readers. |
 | `python tools/inspect_save.py --save <pack>/<save_id>` | One-screen plain-text state summary. |
 
 ### Setup

@@ -35,12 +35,26 @@ Before reading the user's turn input, load:
 **Never** scrape `current_scene.md` or `session_log.md` for scene state.
 Those are display surfaces; they can drift. The JSON files are canonical.
 
-## Step 1 · Narrate
+## Step 1 · Narrate + offer 3+D options
 
-Using the loaded context, write 150–400 characters of prose **in the
-pack's declared `language`** (from `packs/<name>/index.md`), responding
-to the user's input. Style follows `genre_packs/universal/style_guide.md`
-plus any novel-level overrides.
+Using the loaded context, produce the turn output **in the pack's
+declared `language`** (from `packs/<name>/index.md`). Every turn
+has two parts:
+
+1. **Narration** — 150–400 characters of prose responding to the
+   user's input. Style follows
+   `genre_packs/universal/style_guide.md` plus any novel-level
+   overrides.
+2. **Options block** — exactly three GM-proposed options
+   (`选项A/B/C` in zh, `Option A/B/C` in en), each with a short
+   tactic label in parentheses and a 60–150 character diegetic
+   action description, followed by the fixed free-form slot
+   (`选项D/Option D`). See `prompts/gm_system_fragment.md` for the
+   required template and rules.
+
+Persist the narration and the four option strings separately in
+Step 3; `session_log.jsonl` keeps `narration` (prose only) and
+`options` (list of 4 full strings A/B/C/D) as distinct fields.
 
 ### Player agency (load-bearing)
 
@@ -127,7 +141,9 @@ Write the updated:
 - `open_loops.json`,
 - `player.json` (mirror of `world_state.player`),
 - append one entry to `session_log.jsonl`:
-  `{turn, at, player_input, narration, summary}`.
+  `{turn, at, player_input, narration, options, summary}` where
+  `options` is the list of four strings (A/B/C/D) shown to the
+  player this turn, verbatim.
 
 If `hidden_truths_append` was used, append to `meta.json::hidden_truths`
 (do **not** write `hidden_truths.md` directly — Step 4 regenerates it).
@@ -149,9 +165,10 @@ talking to the user.
 
 ## Step 5 · Respond to the user
 
-Output **only** the narration from Step 1 to the user. The JSON writes
-and `render_save.py` call happen before the reply; the user sees
-prose, not state. On request, the user can run
+Output to the user exactly what Step 1 produced: the prose
+narration, a blank line, then the four option strings (A/B/C/D) —
+nothing else. The JSON writes and `render_save.py` call happen
+before the reply; the user sees prose + options, not state. On request, the user can run
 `python tools/inspect_save.py --save <pack>/<save_id>` to inspect.
 
 ## Failure handling

@@ -135,6 +135,10 @@ class SessionLogEntry(BaseModel):
     at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
     player_input: str
     narration: str
+    options: list[str] = Field(
+        default_factory=list,
+        description="The four option strings (A/B/C/D) the GM showed the player this turn, verbatim.",
+    )
     summary: str = Field(default="", description="One-line summary of what changed.")
 
 
@@ -263,9 +267,9 @@ class Pack(BaseModel):
         default=None,
         description="Required for user packs (typically 'universal'). Must be None for genre packs.",
     )
-    language: str | None = Field(
+    language: Literal["zh", "en"] | None = Field(
         default=None,
-        description="BCP-47-ish language code (e.g. 'zh', 'en', 'ja'). Required on user packs; may be None on genre packs.",
+        description="User-pack language. Must be 'zh' or 'en'; required on user packs, None on genre packs.",
     )
 
     # Top-level meta pages

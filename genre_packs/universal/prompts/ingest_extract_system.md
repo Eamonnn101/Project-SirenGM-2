@@ -12,14 +12,13 @@ produce zero or more JSON lines in `packs/<pack>/.ingest/mentions.jsonl`.
 
 ## Language
 
-The user pack's `index.md` declares `language: <code>` (e.g. `zh`,
-`en`, `ja`). Load that value before extracting.
+The user pack's `index.md` declares `language: zh` or `language: en`
+(the only two supported values). Load that value before extracting.
 
 - `name` fields hold the **native form** from the novel, in the
   pack's language.
-- `slug` fields are always ASCII snake_case. For non-Latin source
-  languages, romanize (pinyin, rōmaji, Wade–Giles — pick one scheme
-  and stay consistent throughout the pack).
+- `slug` fields are always ASCII snake_case. For Chinese sources,
+  romanize via pinyin and stay consistent throughout the pack.
 - `evidence` quotes are verbatim from the novel, in the source
   language.
 - Free-form `notes` are written in the pack's declared language.

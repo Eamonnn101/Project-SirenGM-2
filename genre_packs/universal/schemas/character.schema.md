@@ -12,7 +12,8 @@ must produce these fields; lint rejects missing required fields.
 
 - `slug` (string, snake_case, ASCII): unique id in this category.
 - `name` (string): display name **in the pack's declared `language`**.
-  For non-Latin names, put the native form here and romanize the slug.
+  For Chinese packs, put the native form here (e.g. `萧炎`) and
+  romanize the slug via pinyin (`xiao_yan`).
 - `role` (string): free-form role label, e.g. `protagonist`, `mentor`,
   `rival`, `antagonist`, `ally`, `informant`. One character per user
   pack must have `role: protagonist`.
@@ -48,7 +49,12 @@ any hard character invariants ("would never betray the guild",
 "refuses to lie"). Do not describe "what happens when the player
 does X" — that is the job of arc/event pages.
 
-Cross-references to other entities use `[[slug]]` syntax.
+Cross-references to other entities use the piped wiki-link dialect
+`[[slug|Display]]`. The bare `[[slug]]` form is only acceptable when
+the target entity's `name` is already ASCII; packs whose entities
+have non-ASCII names (e.g. `萧炎`, `八嶋`) must always carry a
+display label so prose stays readable. See
+`prompts/ingest_draft_system.md` for the full rule.
 
 ## Anti-patterns
 

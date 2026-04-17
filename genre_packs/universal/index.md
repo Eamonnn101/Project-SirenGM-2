@@ -11,10 +11,10 @@ contains no world-specific facts — no characters, factions, locations,
 arcs, events — and no fiction-specific mechanics. All novel-specific
 rules live in `packs/<name>/novel_rules.md`, synthesized during ingest.
 
-This pack is language-agnostic. Each user pack declares its own
-`language: <code>` in `index.md` frontmatter, and the agent writes
-narration, entity names, and novel rules in that language. Slugs remain
-ASCII (`[a-z0-9_]+`) regardless of language.
+Each user pack declares its own `language` in `index.md` frontmatter
+(`zh` or `en` — the only two supported values; `zh` is the rendering
+default). The agent writes narration, entity names, and novel rules
+in that language. Slugs remain ASCII (`[a-z0-9_]+`) regardless.
 
 ## Index
 

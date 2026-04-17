@@ -41,3 +41,7 @@ Cover: how the event should feel in prose; exactly which state-patch
 ops should fire when it triggers (e.g. "append to
 `hidden_truths`", "add `loop:missing_elder` to `open_loops`"); and any
 follow-on arcs it hands off to. Keep it to a page.
+
+Cross-references use the piped wiki-link dialect `[[slug|Display]]`;
+see `prompts/ingest_draft_system.md`. Bare `[[slug]]` is only valid
+when the target entity's `name` is ASCII.

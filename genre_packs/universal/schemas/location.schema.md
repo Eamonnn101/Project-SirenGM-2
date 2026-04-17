@@ -28,4 +28,6 @@ Extra fields pass through (`climate`, `era`, `terrain_type`, etc.).
 
 Cover: physical layout, who is usually present, environmental cues,
 typical hazards, entry requirements if any are strictly enforced.
-Cross-references use `[[slug]]`.
+Cross-references use the piped wiki-link dialect `[[slug|Display]]`;
+see `prompts/ingest_draft_system.md`. Bare `[[slug]]` is only valid
+when the target entity's `name` is ASCII.

@@ -37,4 +37,6 @@ internal structure, standing alliances and rivalries, hard taboos,
 recent direction. Do not list individual members' histories — those
 belong on their character pages.
 
-Cross-references use `[[slug]]`.
+Cross-references use the piped wiki-link dialect `[[slug|Display]]`;
+see `prompts/ingest_draft_system.md`. Bare `[[slug]]` is only valid
+when the target entity's `name` is ASCII.

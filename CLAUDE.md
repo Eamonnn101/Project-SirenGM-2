@@ -6,9 +6,9 @@ points here.
 ## The thesis
 
 **AI compiles a novel into a playable world.** A user drops one or
-more novels into `raw/novel/` (any genre, any language), asks the
-agent to ingest them, and the agent produces one user pack per novel
-under `packs/<pack>/`. The user then plays turns against a chosen pack
+more novels into `raw/novel/` (any genre; Chinese or English text
+only), asks the agent to ingest them, and the agent produces one
+user pack per novel under `packs/<pack>/`. The user then plays turns against a chosen pack
 + a save in `saves/<pack>/<save_id>/`, and the agent maintains both
 the pack and the save over the course of the run.
 
@@ -103,7 +103,8 @@ The pack slug is derived from the novel's filename during ingest
 (ASCII snake_case; see `playbooks/ingest.md` for the exact rule).
 
 - `index.md` — frontmatter `name`, `kind: user`,
-  `inherits_genre: universal`, `language: <code>` (e.g. `zh`, `en`, `ja`).
+  `inherits_genre: universal`, `language: zh` or `language: en` (only
+  these two are supported; rendering defaults to `zh` if unset).
 - `novel_rules.md` — **load-bearing**; the novel's power/magic/tech
   system, social order, tone, hard canon. Read on every turn.
 - `overview.md`, `canon_guardrails.md` (novel-specific overrides on top

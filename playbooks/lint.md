@@ -16,7 +16,12 @@ Exit 0 = clean. Exit 1 = issues listed on stdout. Categorize issues:
 - **Cross-ref violations** (unknown affiliation / leader / location slug)
   — either create the missing entity page or correct the slug on the
   referring page.
-- **Orphan wiki-links** (`[[slug]]` with no matching entity) — same fix.
+- **Orphan wiki-links** (`[[slug]]` or `[[slug|Display]]` with no
+  matching entity) — same fix.
+- **Bare slug on non-ASCII-named entity** (e.g. `[[xiao_yan]]`
+  pointing at an entity whose `name` is `萧炎`) — rewrite the
+  reference as `[[xiao_yan|萧炎]]`. The slug stays canonical; the
+  display label keeps prose readable.
 - **Genre purity violations** (novel-specific content in the universal
   genre pack) — move it into the user pack's `novel_rules.md`. Genre
   packs are templates, never novel data.

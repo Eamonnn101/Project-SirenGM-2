@@ -16,7 +16,8 @@ re-normalized.
 
 Labels in the rendered surfaces are picked from a per-language dictionary
 keyed by the pack's declared `language` (from `packs/<pack>/index.md`).
-Unknown languages fall back to English with a stderr warning.
+Only `zh` and `en` are supported; when the language is missing or the
+save has no resolvable pack, rendering defaults to `zh`.
 
 These markdown surfaces are display-only. JSON wins if the two disagree.
 """
@@ -52,32 +53,10 @@ else:
 
 
 # ---------------------------------------------------------------------------
-# Localized labels. Add more languages by extending this dict.
+# Localized labels. Only 'zh' and 'en' are supported; 'zh' is the default.
 # ---------------------------------------------------------------------------
 
 LABELS: dict[str, dict[str, str]] = {
-    "en": {
-        "current_scene": "Current Scene",
-        "turn": "Turn",
-        "day": "Day",
-        "location": "Location",
-        "risk": "Risk",
-        "present": "Present",
-        "active_threads": "Active threads",
-        "objectives": "Objectives",
-        "last_narration": "Last narration",
-        "no_narration": "(no narration yet)",
-        "player_progression": "Progression",
-        "player_affiliation": "Affiliation",
-        "player_status": "Status",
-        "player_titles": "Titles",
-        "player_inventory": "Inventory",
-        "session_log": "Session Log",
-        "turn_label": "turn",
-        "player_input": "Player",
-        "hidden_truths": "Hidden Truths",
-        "hidden_truths_empty": "(empty)",
-    },
     "zh": {
         "current_scene": "当前场景",
         "turn": "回合",
@@ -97,25 +76,38 @@ LABELS: dict[str, dict[str, str]] = {
         "session_log": "本局日志",
         "turn_label": "回合",
         "player_input": "玩家",
+        "options": "选项",
         "hidden_truths": "暗线",
         "hidden_truths_empty": "（暂无）",
+    },
+    "en": {
+        "current_scene": "Current Scene",
+        "turn": "Turn",
+        "day": "Day",
+        "location": "Location",
+        "risk": "Risk",
+        "present": "Present",
+        "active_threads": "Active threads",
+        "objectives": "Objectives",
+        "last_narration": "Last narration",
+        "no_narration": "(no narration yet)",
+        "player_progression": "Progression",
+        "player_affiliation": "Affiliation",
+        "player_status": "Status",
+        "player_titles": "Titles",
+        "player_inventory": "Inventory",
+        "session_log": "Session Log",
+        "turn_label": "turn",
+        "player_input": "Player",
+        "options": "Options",
+        "hidden_truths": "Hidden Truths",
+        "hidden_truths_empty": "(empty)",
     },
 }
 
 
-_WARNED_LANGUAGES: set[str] = set()
-
-
 def _labels_for(language: str | None) -> dict[str, str]:
-    if language and language in LABELS:
-        return LABELS[language]
-    if language and language not in _WARNED_LANGUAGES:
-        print(
-            f"warning: render_save has no label map for language {language!r}; falling back to 'en'",
-            file=sys.stderr,
-        )
-        _WARNED_LANGUAGES.add(language)
-    return LABELS["en"]
+    return LABELS.get(language or "zh", LABELS["zh"])
 
 
 def _read_pack_language(packs_root: Path, pack_name: str) -> str | None:
@@ -280,6 +272,12 @@ def render_session_log(save: Save, L: dict[str, str]) -> tuple[str, str]:
         md_lines.append(f"**{L['player_input']}**: " + entry.player_input.strip())
         md_lines.append("")
         md_lines.append(entry.narration.strip())
+        if entry.options:
+            md_lines.append("")
+            md_lines.append(f"**{L['options']}**")
+            md_lines.append("")
+            for opt in entry.options:
+                md_lines.append(f"- {opt.strip()}")
         if entry.summary:
             md_lines.append("")
             md_lines.append(f"> _{entry.summary}_")

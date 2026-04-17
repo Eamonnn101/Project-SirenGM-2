@@ -1,13 +1,13 @@
 # raw/novel/
 
-Drop a novel text file here (plain `.txt`, UTF-8) — any genre, any
-language. Then open the repo in Claude Code or Codex and tell the
-agent:
+Drop a novel text file here (plain `.txt`, UTF-8) — any genre,
+Chinese or English only. Then open the repo in Claude Code or Codex
+and tell the agent:
 
 > "Ingest `raw/novel/yourfile.txt` as pack `yourpack`."
 
 (If you want to override the auto-detected language, add
-"...in <language>" to the request.)
+"...in Chinese" or "...in English" to the request.)
 
 The agent follows [`playbooks/ingest.md`](../../playbooks/ingest.md)
 and writes the compiled user pack into `packs/<yourpack>/`, with
