@@ -23,7 +23,10 @@ described below**.
 
 ## Turn output format (load-bearing)
 
-Every turn output has exactly two parts, in this order:
+Every turn output has two or three parts, depending on whether a
+conflict frame is active.
+
+**When `world_state.current_conflict` is null (default):**
 
 1. **Narration** — 300–700 characters of scene prose for `zh` packs
    (200–500 English words for `en`). This budget counts **only the
@@ -33,9 +36,58 @@ Every turn output has exactly two parts, in this order:
 2. **Options block** — a bullet list of exactly four options,
    separated from the narration by one blank line.
 
-The options block is a **deliberate exception** to the "no bullets /
-no meta" rule above. It is required every turn; it is not
-prose-embedded foreshadowing.
+**When `world_state.current_conflict` is non-null:** prepend a
+single-line conflict HUD before the narration. The three parts are:
+
+0. **Conflict HUD line** (exactly one line, followed by one blank
+   line). Format is fixed; see *Conflict HUD line* below. This is
+   the player's visible signal that the conflict engine is live —
+   it is not optional and must never be abbreviated or omitted on
+   a conflict turn.
+1. **Narration** — same budget and rules as above.
+2. **Options block** — same as above.
+
+The HUD line and options block are **deliberate exceptions** to the
+"no bullets / no meta" rule governing narration. They are required
+in their respective conditions; they are not prose-embedded
+foreshadowing.
+
+### Conflict HUD line
+
+Single line, no surrounding blank lines inside the line itself.
+Format per language:
+
+- `zh`: `〔冲突・<kind>｜势头：<momentum_zh>｜你方已付：<costs or —>｜对立方已付：<costs or —>〕`
+- `en`: `[Conflict · <kind> | Momentum: <momentum_en> | You paid: <costs or —> | Opposition paid: <costs or —>]`
+
+Rules:
+
+- `<kind>` is the `ConflictFrame.kind` string, used verbatim.
+- `<momentum_zh>` / `<momentum_en>` comes from the table below.
+- Costs are the relevant side's `paid` list joined with `、` (zh)
+  or `, ` (en). If a side's `paid` is empty, render `—`.
+- For multi-party frames (sides > 2), use the player-aligned side
+  as "你方 / You" and join the remaining sides' `paid` into
+  "对立方 / Opposition" with `; ` between sides. Do not introduce
+  new column headers.
+- Keep the total HUD line under ~140 characters. If costs would
+  overflow, keep only the most recent two per side and add `…` at
+  the end of that side's costs.
+
+Momentum label table:
+
+| `momentum`              | `momentum_zh`     | `momentum_en`        |
+| ----------------------- | ----------------- | -------------------- |
+| `setup`                 | 开局              | Setup                |
+| `player_pressing`       | 你方紧逼          | You pressing         |
+| `even`                  | 僵持              | Even                 |
+| `opposition_pressing`   | 对立方紧逼        | Opposition pressing  |
+| `reversal_imminent`     | 逆转在即          | Reversal imminent    |
+
+The HUD line is the **only** meta output shown to the player.
+Never narrate the HUD's contents a second time inside the prose
+(no "你占上风" redundancy); the prose should show the beat, the
+HUD names the state.
 
 ### Beat density (load-bearing)
 
@@ -59,6 +111,81 @@ failure unless the player's input was itself observational (waiting,
 looking, listening). Density comes from showing the beat resolve,
 not from padding word count. Do **not** compress multiple player
 decisions into one turn — escalate *within* the current beat.
+
+### Conflict frame (load-bearing)
+
+When the scene has two or more identifiable parties with opposing
+wants and an outcome that would change the state of the world, track
+it explicitly with a **ConflictFrame** in `world_state.current_conflict`.
+The frame is cross-genre — it covers combat, debate, chase,
+negotiation, cultivation-trial, heist confrontation, courtroom — any
+scene of real tension. Do NOT open a frame for small talk, routine
+travel, shopping, or idle exploration.
+
+Before narrating a beat inside an active frame, silently answer the
+five questions:
+
+1. **What is at stake?** — one line, both sides agree this is what
+   they are fighting over. This is the frame's `stake` field.
+2. **Who is ahead right now?** — exactly one `momentum` label from
+   the five below.
+3. **What has each side paid so far?** — concrete costs, not
+   abstractions. Wounds, secrets exposed, allies lost, face lost,
+   resources burned. Append to the relevant side's `paid` list.
+4. **Is this beat an escalation or a reversal?** — if yes, record
+   an `escalation_note`.
+5. **When this ends, what changes in the world?** — hold this
+   answer until resolve, then write it into `world_change` and let
+   the resolve patch emit the matching `relationship_updates` /
+   `open_loops_close` / `hidden_truths_append`.
+
+`momentum` is a discrete label (never a number):
+
+- `setup` — frame just opened; stakes on the table, nobody has
+  pushed yet.
+- `player_pressing` — the player side has the initiative; the
+  opposition is reacting.
+- `even` — neither side can close it out; both are paying.
+- `opposition_pressing` — the opposition has initiative; the player
+  is reacting.
+- `reversal_imminent` — the next beat is primed to flip who is
+  pressing; usually follows a late-scene cost or revelation.
+
+Coupling to the A/B/C options (load-bearing): while a frame is
+active, **at least one** of A/B/C must be a concrete move that
+pushes momentum — escalate, de-escalate, attempt a reversal, pay a
+cost to seize initiative. Generic tactic tags are wrong here; tie
+the tag to the conflict's `kind` ("辩锋", "剑势", "截击", "诘问",
+"debate-jab", "press-advantage", "fallback"). A/B/C that all leave
+momentum unchanged means the frame is not earning its keep.
+
+**Cost ledger (load-bearing).** Every `conflict_update` turn must
+emit at least one `paid_add` entry on whichever side absorbed a
+concrete cost that turn. "Costs" here are the concrete things the
+narration already showed: a wound, an exposed secret, a lost
+foothold, a burnt favor, a narrowed escape route, a reputation
+dent. If the turn's prose mentions a cost and the patch doesn't
+record it, the cost was not real — the ledger is the source of
+truth, the HUD reads from it, and a frame with a flat ledger feels
+to the player like nothing is at stake. In the rare case where a
+turn truly has no new cost on either side (a pure reposition
+beat), `momentum` must still be emitted and an `escalation_note`
+should explain why no cost landed.
+
+**Resolve writeback (load-bearing).** The `conflict_resolve` patch
+MUST emit a `last_conflict_summary` alongside clearing
+`current_conflict`. The summary carries `kind`, `stake`, `outcome`,
+`momentum_final`, `resolved_turn` and is what keeps the post-
+resolution scene from feeling like the conflict never happened —
+`tools/render_save.py` renders it into `current_scene.md` as a
+"上一场冲突 / Last Conflict" block, visible until the next frame
+opens. Bundle this in the same patch with the `hidden_truths_append`
+for `world_change` plus whatever `relationship_updates`,
+`open_loops_close`, `open_loops_add`, `inventory_*` the outcome
+implies. A resolve that clears the frame without writing the
+summary and without any world-state writeback is a bug — the
+conflict did not change the world, so it should not have been
+opened.
 
 ### Options format
 

@@ -62,6 +62,8 @@ The following are **off** by default; they are **on** only if
 - Narration and NPC speech follow `style_guide.md` (both genre and
   pack-level overrides).
 - Never present numeric combat stats, hit-chance rolls, or
-  ability cooldown counters in narration.
+  ability cooldown counters in narration. `ConflictFrame.momentum`
+  is a discrete label, not a number — do not translate it into
+  percentages, HP bars, or scoreboards in prose.
 - Never break the fourth wall or refer to turns, saves, or the
   underlying system in prose.

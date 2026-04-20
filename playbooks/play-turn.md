@@ -13,6 +13,12 @@ Before reading the user's turn input, load:
 
 1. `saves/<pack>/<save_id>/world_state.json`,
    `relationship_state.json`, `open_loops.json`, `meta.json`.
+   If `world_state.current_conflict` is non-null, the scene is
+   inside an active conflict frame — stakes, sides, and momentum in
+   that frame constrain the next turn's narration and options. See
+   *Conflict frame lifecycle* in this playbook and the
+   `genre_packs/universal/prompts/gm_system_fragment.md` section
+   on conflict frames.
 2. Last 6 entries of `saves/<pack>/<save_id>/session_log.jsonl`
    (`tail -n 6`).
 3. `meta.json::hidden_truths` (the rendered `hidden_truths.md` is a
@@ -123,6 +129,28 @@ JSON object with these optional top-level keys:
 - `open_loops_close` — list of loop ids.
 - `inventory_add` / `inventory_remove` — items / slugs.
 - `hidden_truths_append` — paragraph to append to `meta.json::hidden_truths` (the `.md` re-renders from it).
+- `conflict_open` — a full `ConflictFrame` object to install into
+  `world_state.current_conflict`. Rejected with a divergence if a
+  frame is already active; to replace a stale frame, resolve the
+  old one first.
+- `conflict_update` — merge patch for the active frame:
+  `{momentum?, escalation_note?, side_updates?: {label: {want?,
+  paid_add?, members_add?, members_remove?}}}`. Dropped with a
+  divergence if no frame is active, or if a `side_updates` label
+  does not match any existing side.
+- `conflict_resolve` — `{outcome, momentum_final, world_change}`.
+  Clears `current_conflict`, writes `world_change` into
+  `meta.json::hidden_truths` via the normal `hidden_truths_append`
+  path, AND writes a `ConflictSummary` into
+  `world_state.last_conflict_summary` (fields `id, kind, stake,
+  outcome, momentum_final, resolved_turn` populated from the
+  resolving frame plus the resolve payload — the renderer needs
+  this block to keep the scene from feeling empty after resolve).
+  The resolve patch MUST also be combined in the same turn with
+  whichever of `relationship_updates`, `open_loops_close`,
+  `open_loops_add`, `inventory_*` the outcome implies. A resolve
+  that writes no world-state writeback is a bug: the conflict did
+  not change the world and should not have been opened.
 - `divergence` — `{reason, detail}` to append to `divergences.jsonl` when
   the narration implied something the patch can't faithfully encode.
 
@@ -138,6 +166,39 @@ When the player has diverged from an active thread, the patch SHOULD
 emit `active_threads_remove` for the abandoned thread in the same turn
 — don't let dead threads linger and re-inject themselves into future
 context.
+
+### Conflict frame lifecycle
+
+A conflict frame is a scene of real tension with two or more named
+parties, opposing wants, and an outcome that would change the state
+of the world. The engine is cross-genre: `kind` is whatever the scene
+actually is (辩论, 围城, 走私交接, 丹药失控, debate, duel, chase,
+courtroom, …), picked fresh per frame.
+
+- **Open (`conflict_open`)** — emit the turn the stakes become
+  real, not earlier. Do not open a frame for small talk, logistics,
+  or idle exploration. `sides` needs at least two entries; each
+  side's `want` is one line; include the PC's side (`members`
+  contains the PC's character slug or the literal `player`).
+  `momentum` on opening is almost always `setup`.
+- **Update (`conflict_update`)** — every turn the frame is live,
+  emit at least `momentum` (even if it stayed the same) and, when a
+  pivotal beat landed, an `escalation_note`. Track costs with
+  `side_updates[label].paid_add`. Keep each entry short — a bullet,
+  not a paragraph.
+- **Resolve (`conflict_resolve`)** — emit the turn the stakes are
+  answered or the player walks away. Always combine with the
+  writebacks the outcome implies: `hidden_truths_append` for
+  private GM knowledge, `relationship_updates` for stance changes,
+  `open_loops_close` / `open_loops_add` for hooks created or shut,
+  `inventory_*` for gear won or lost. If the player abandons the
+  conflict mid-scene, resolve with `momentum_final: "even"` (or
+  whichever label fits) and `world_change` stating the abandonment
+  — do not leave the frame open.
+
+If the frame sits open for more than ~10 turns, `tools/lint_save.py`
+will warn. That is a cue to resolve or narrow the frame, not a
+hard error.
 
 ## Step 3 · Persist
 
@@ -171,10 +232,28 @@ talking to the user.
 
 ## Step 5 · Respond to the user
 
-Output to the user exactly what Step 1 produced: the prose
-narration, a blank line, then the four option strings (A/B/C/D) —
-nothing else. The JSON writes and `render_save.py` call happen
-before the reply; the user sees prose + options, not state. On request, the user can run
+Output to the user exactly what Step 1 produced. The exact shape
+depends on whether a conflict frame is active after this turn's
+patch has been applied:
+
+- **No conflict frame (default)** — prose narration, one blank
+  line, the four option strings (A/B/C/D). Nothing else.
+- **Conflict frame is active** — a single-line conflict HUD (format
+  per `genre_packs/universal/prompts/gm_system_fragment.md` §
+  *Conflict HUD line*), one blank line, the prose narration, one
+  blank line, the four option strings. The HUD line is the only
+  meta the player sees; it is required on every conflict turn and
+  must never be abbreviated or folded into the prose.
+
+The JSON writes and `render_save.py` call happen **before** the
+reply, so the HUD reads the updated `current_conflict` (the one
+this turn just wrote, including any `conflict_open`,
+`conflict_update`, or `conflict_resolve`). If this turn resolved
+the frame, there is no HUD line next turn — but the player still
+sees the "上一场冲突 / Last Conflict" block in
+`current_scene.md` on request until the next conflict opens.
+
+On request, the user can run
 `python tools/inspect_save.py --save <pack>/<save_id>` to inspect.
 
 ## Failure handling

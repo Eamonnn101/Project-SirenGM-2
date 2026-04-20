@@ -91,6 +91,9 @@ def lint_save(save_dir: Path, *, packs_root: Path | None = None) -> list[str]:
     elif packs_root is not None:
         issues.append(f"could not load pack {save.pack_name!r} under {packs_root}/ for slug check")
 
+    # 7. Conflict frame freshness.
+    issues.extend(_lint_conflict_frame(save))
+
     return issues
 
 
@@ -197,6 +200,30 @@ def _lint_slugs(save, pack) -> list[str]:
         _check(item.slug, "world_state.player.inventory", known)
     for slug in save.relationships.by_slug:
         _check(slug, "relationship_state.by_slug", known)
+    if w.current_conflict is not None:
+        for side in w.current_conflict.sides:
+            for member in side.members:
+                if member == "player":
+                    continue
+                _check(member, f"current_conflict.sides[{side.label!r}].members", known)
+    return issues
+
+
+STALE_CONFLICT_THRESHOLD = 10
+
+
+def _lint_conflict_frame(save) -> list[str]:
+    conflict = save.world.current_conflict
+    if conflict is None:
+        return []
+    issues: list[str] = []
+    age = save.world.turn - conflict.opened_turn
+    if age > STALE_CONFLICT_THRESHOLD:
+        issues.append(
+            f"current_conflict {conflict.id!r} is {age} turns old "
+            f"(opened turn {conflict.opened_turn}, now {save.world.turn}); "
+            f"resolve it or revise the frame"
+        )
     return issues
 
 

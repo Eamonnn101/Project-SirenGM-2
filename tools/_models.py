@@ -20,6 +20,13 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 RiskLevel = Literal["calm", "tense", "dangerous", "lethal"]
 RelationshipStatus = Literal["unknown", "acquainted", "friendly", "close", "trusted", "hostile", "enemy"]
 OpenLoopStatus = Literal["open", "closed", "abandoned"]
+ConflictMomentum = Literal[
+    "setup",
+    "player_pressing",
+    "even",
+    "opposition_pressing",
+    "reversal_imminent",
+]
 
 
 class InventoryItem(BaseModel):
@@ -61,6 +68,67 @@ class ActiveThread(BaseModel):
     priority: Literal["background", "active", "urgent"] = "active"
 
 
+class ConflictSide(BaseModel):
+    """One party in a conflict frame."""
+
+    model_config = ConfigDict(extra="forbid")
+    label: str = Field(..., description="Display name for this side, e.g. '玩家方', '叛军'.")
+    members: list[str] = Field(
+        default_factory=list,
+        description="Entity slugs aligned with this side. 'player' is reserved for the PC.",
+    )
+    want: str = Field(..., description="One-line description of this side's goal.")
+    paid: list[str] = Field(
+        default_factory=list,
+        description="Short descriptions of costs this side has already absorbed.",
+    )
+
+
+class ConflictFrame(BaseModel):
+    """A scene of tension tracked by the conflict engine.
+
+    Cross-genre: `kind` is free-form (combat, debate, chase, trial, ...).
+    Momentum is a discrete label, never a number — consistent with the
+    no-numeric-combat-stats guardrail.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(..., description="Free-form id, e.g. 'c_bianlun_01'.")
+    kind: str = Field(..., description="Free-form conflict kind the GM chose for this scene.")
+    stake: str = Field(..., description="One-line 'what both sides are fighting over'.")
+    sides: list[ConflictSide] = Field(..., description="Two or more parties with opposing wants.")
+    momentum: ConflictMomentum = "setup"
+    escalation_notes: list[str] = Field(default_factory=list)
+    opened_turn: int
+
+    @model_validator(mode="after")
+    def _validate_sides(self) -> "ConflictFrame":
+        if len(self.sides) < 2:
+            raise ValueError("ConflictFrame.sides must have at least 2 entries")
+        labels = [s.label for s in self.sides]
+        if len(set(labels)) != len(labels):
+            raise ValueError(f"ConflictFrame.sides has duplicate labels: {labels}")
+        return self
+
+
+class ConflictSummary(BaseModel):
+    """Compact trace of the most recently resolved conflict.
+
+    Written by `conflict_resolve` alongside clearing `current_conflict`.
+    Overwritten by the next resolve — only the most recent conflict is
+    retained. Rendered in `current_scene.md` as a "last conflict" block
+    so the post-resolution state doesn't feel empty to the player.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+    id: str
+    kind: str
+    stake: str
+    outcome: str = Field(..., description="One-line summary of how the conflict ended.")
+    momentum_final: ConflictMomentum
+    resolved_turn: int
+
+
 class WorldState(BaseModel):
     """Canonical world state. All runtime scene context derives from this.
 
@@ -86,6 +154,14 @@ class WorldState(BaseModel):
         description="Short objective strings that the GM should keep live.",
     )
     risk_level: RiskLevel = "calm"
+    current_conflict: ConflictFrame | None = Field(
+        default=None,
+        description="Active conflict frame, if a scene of tension is live. Null when not in conflict.",
+    )
+    last_conflict_summary: ConflictSummary | None = Field(
+        default=None,
+        description="Trace of the most recently resolved conflict. Cleared to null only by a new conflict_open; overwritten by the next resolve.",
+    )
 
     player: PlayerState
     flags: dict[str, str | int | bool] = Field(default_factory=dict)

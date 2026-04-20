@@ -79,6 +79,18 @@ LABELS: dict[str, dict[str, str]] = {
         "options": "选项",
         "hidden_truths": "暗线",
         "hidden_truths_empty": "（暂无）",
+        "current_conflict": "当前冲突",
+        "conflict_stake": "争点",
+        "conflict_kind": "类型",
+        "conflict_momentum": "势头",
+        "conflict_sides": "各方",
+        "conflict_side_want": "想要",
+        "conflict_side_paid": "付出",
+        "conflict_side_members": "成员",
+        "conflict_escalation": "升级要点",
+        "last_conflict": "上一场冲突",
+        "last_conflict_outcome": "结果",
+        "last_conflict_resolved_at": "结束于回合",
     },
     "en": {
         "current_scene": "Current Scene",
@@ -102,6 +114,18 @@ LABELS: dict[str, dict[str, str]] = {
         "options": "Options",
         "hidden_truths": "Hidden Truths",
         "hidden_truths_empty": "(empty)",
+        "current_conflict": "Current Conflict",
+        "conflict_stake": "Stake",
+        "conflict_kind": "Kind",
+        "conflict_momentum": "Momentum",
+        "conflict_sides": "Sides",
+        "conflict_side_want": "wants",
+        "conflict_side_paid": "paid",
+        "conflict_side_members": "members",
+        "conflict_escalation": "Escalation beats",
+        "last_conflict": "Last Conflict",
+        "last_conflict_outcome": "Outcome",
+        "last_conflict_resolved_at": "Resolved on turn",
     },
 }
 
@@ -219,12 +243,47 @@ def render_current_scene(save: Save, L: dict[str, str]) -> str:
         lines.append(f"- **{L['objectives']}**:")
         for o in w.current_objectives:
             lines.append(f"  - {o}")
+    if w.current_conflict is not None:
+        lines += _render_conflict_block(w.current_conflict, L)
+    elif w.last_conflict_summary is not None:
+        lines += _render_last_conflict_block(w.last_conflict_summary, L)
     if save.session_log:
         last = save.session_log[-1]
         lines += ["", f"## {L['last_narration']}", "", last.narration.strip(), ""]
     else:
         lines += ["", f"_{L['no_narration']}_", ""]
     return "\n".join(lines) + "\n"
+
+
+def _render_conflict_block(conflict, L: dict[str, str]) -> list[str]:
+    lines: list[str] = ["", f"## {L['current_conflict']}", ""]
+    lines.append(f"- **{L['conflict_stake']}**: {conflict.stake}")
+    lines.append(f"- **{L['conflict_kind']}**: {conflict.kind}")
+    lines.append(f"- **{L['conflict_momentum']}**: {conflict.momentum}")
+    lines.append(f"- **{L['conflict_sides']}**:")
+    for side in conflict.sides:
+        paid = ", ".join(side.paid) if side.paid else "—"
+        members = ", ".join(f"`{m}`" for m in side.members) if side.members else "—"
+        lines.append(
+            f"  - `{side.label}` · {L['conflict_side_want']}: {side.want} · "
+            f"{L['conflict_side_paid']}: {paid}"
+        )
+        lines.append(f"    {L['conflict_side_members']}: {members}")
+    if conflict.escalation_notes:
+        lines.append(f"- **{L['conflict_escalation']}**:")
+        for note in conflict.escalation_notes:
+            lines.append(f"  - {note}")
+    return lines
+
+
+def _render_last_conflict_block(summary, L: dict[str, str]) -> list[str]:
+    lines: list[str] = ["", f"## {L['last_conflict']}", ""]
+    lines.append(f"- **{L['conflict_kind']}**: {summary.kind}")
+    lines.append(f"- **{L['conflict_stake']}**: {summary.stake}")
+    lines.append(f"- **{L['last_conflict_outcome']}**: {summary.outcome}")
+    lines.append(f"- **{L['conflict_momentum']}**: {summary.momentum_final}")
+    lines.append(f"- **{L['last_conflict_resolved_at']}**: {summary.resolved_turn}")
+    return lines
 
 
 def render_player_md(save: Save, L: dict[str, str]) -> str:
