@@ -33,16 +33,19 @@ frame with stakes, momentum, and a cost ledger. See
    cp my_novel.txt raw/novel/
    ```
 3. **Ingest.** Tell the agent:
-   > "Ingest `raw/novel/` as pack."
+   > "导入小说" / "Ingest novels"
 
-   The agent derives slugs from filenames (`My Cool Book.txt` →
-   `my_cool_book`), prints a pre-scan (source → slug → action), and
-   after you confirm, compiles each novel into `packs/<slug>/` with
-   a Stage-0 checkpoint per book so you can catch setting misreads
-   early. Expect 10–60 minutes per novel. Already-ingested packs are
-   skipped unless you say "re-ingest". The single-novel form
-   (`Ingest raw/novel/my_novel.txt as pack mypack`) is still
-   accepted.
+   The agent scans `raw/novel/`, derives slugs from filenames
+   (`My Cool Book.txt` → `my_cool_book`), prints a pre-scan
+   (source → slug → action), and after you confirm, compiles each
+   novel into `packs/<slug>/` with a Stage-0 checkpoint per book so
+   you can catch setting misreads early. Expect 10–60 minutes per
+   novel. Already-ingested packs are skipped unless you say
+   "re-ingest".
+
+   To name a single pack yourself:
+   > "将 `raw/novel/my_novel.txt` 导入为 pack `mypack`" /
+   > "Ingest `raw/novel/my_novel.txt` as pack `mypack`"
 
 4. **New game.** Tell the agent:
    > "开始游戏" / "Start a new game"
@@ -229,11 +232,11 @@ call these at the appropriate points.
 
 ### v0.2
 
-- **Batch ingest.** `Ingest raw/novel/ as pack` scans the directory,
-  derives slugs from filenames, and ingests each `.txt` / `.md`
-  source in sequence with a per-novel Stage-0 checkpoint.
-  Already-ingested packs (matched by `source_file`) are skipped;
-  silent slug-collapse across sources is refused.
+- **Batch ingest.** `导入小说` / `Ingest novels` scans
+  `raw/novel/`, derives slugs from filenames, and ingests each
+  `.txt` / `.md` source in sequence with a per-novel Stage-0
+  checkpoint. Already-ingested packs (matched by `source_file`)
+  are skipped; silent slug-collapse across sources is refused.
 - **Start a game with no id.** `Start a new game` / "开始游戏" is
   enough; the agent picks the lone pack or asks, and auto-numbers
   saves (`save_001`, `save_002`, …) per pack.

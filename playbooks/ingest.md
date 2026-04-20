@@ -4,11 +4,22 @@ Compile one or more novels into user packs.
 
 ## Invocation forms
 
-The user can invoke ingest in either a batch or explicit form.
+Batch is the main path — each eligible file in `raw/novel/` becomes
+its own pack, auto-named from the filename. The single-file explicit
+form is still supported when the user wants to name the pack
+themselves or pin a language.
+
+All forms below are recognized in either English or Chinese. The
+agent is lenient about exact wording; these are the canonical
+shapes.
 
 ### Batch — preferred
 
-> "Ingest `raw/novel/` as pack."
+Any of these are equivalent:
+
+> "Ingest novels" / "导入小说"
+>
+> "Ingest `raw/novel/`" / "导入 `raw/novel/`"
 
 The agent scans `raw/novel/` and compiles **every eligible source**
 into its own pack, auto-naming each from the filename.
@@ -81,13 +92,15 @@ When Stage 0 writes `packs/<slug>/index.md`, include
 `source_file: <relative path under raw/novel/>` in the frontmatter so
 later batches can tell real collisions from legitimate skips.
 
-### Explicit — still supported
+### Explicit — single-file with named pack
 
-> "Ingest `raw/novel/<file>.txt` as pack `<name>`."
+> "Ingest `raw/novel/<file>.txt` as pack `<name>`" /
+> "将 `raw/novel/<file>.txt` 导入为 pack `<name>`"
 
-Compile a single novel into a named pack. The user may optionally pin
-the language ("…as pack `<name>` in English"); otherwise the agent
-auto-detects it during Stage 0.
+Compile a single novel into a named pack. The user may optionally
+pin the language by appending " in English" / " in Chinese" in
+English, or "，用英文" / "，用中文" in Chinese; otherwise the
+agent auto-detects it during Stage 0.
 
 ---
 

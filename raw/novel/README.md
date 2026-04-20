@@ -4,10 +4,18 @@ Drop a novel text file here (plain `.txt`, UTF-8) — any genre,
 Chinese or English only. Then open the repo in Claude Code or Codex
 and tell the agent:
 
-> "Ingest `raw/novel/yourfile.txt` as pack `yourpack`."
+> "导入小说" / "Ingest novels"
 
-(If you want to override the auto-detected language, add
-"...in Chinese" or "...in English" to the request.)
+That scans this directory and turns each file into its own pack.
+
+To name a single pack yourself instead of letting the filename pick
+the slug:
+
+> "将 `raw/novel/yourfile.txt` 导入为 pack `yourpack`" /
+> "Ingest `raw/novel/yourfile.txt` as pack `yourpack`"
+
+(To override the auto-detected language, add "，用中文" / "，用英文"
+in Chinese, or "...in Chinese" / "...in English" in English.)
 
 The agent follows [`playbooks/ingest.md`](../../playbooks/ingest.md)
 and writes the compiled user pack into `packs/<yourpack>/`, with
