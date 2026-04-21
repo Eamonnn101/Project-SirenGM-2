@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "sirengm-tools"
-version = "0.3.0"
+version = "0.4.0"
 description = "Optional deterministic helper tools for the SirenGM 2 llm-wiki workflow. The main product path is agent-driven and does not require this package."
 readme = "README.md"
 requires-python = ">=3.10"

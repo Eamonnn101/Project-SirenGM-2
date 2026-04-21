@@ -17,11 +17,14 @@ immutable, the pack is an LLM-maintained persistent middle layer, and
 runtime reads from the compiled pack + structured save instead of
 re-deriving from raw text on every turn.
 
-**Version: v0.3** — headline feature is a cross-genre
-[conflict engine](#the-conflict-engine-v03) that gives any scene of
-tension (combat, debate, chase, trial, negotiation) a structured
-frame with stakes, momentum, and a cost ledger. See
-[Changelog](#changelog) for the full list.
+**Version: v0.4** — headline feature is **pacing discipline** on the
+[conflict engine](#the-conflict-engine-v03v04): every frame now
+carries a `beat_budget` (3–6, default 4) that steers conflicts to
+resolve in 3–5 turns, `current_scene.md` flips its momentum field to
+`收束在即 / Endgame` as the frame enters its last beat, the beat-density
+rule doubles from one pivot per turn to two, and routine player actions
+(travel, rest, montage) may compress hours or days into a single turn
+outside conflicts. See [Changelog](#changelog) for the full list.
 
 ## Quickstart
 
@@ -92,7 +95,7 @@ If narrator prose and structured state disagree, structured state wins.
 `active_threads` and `current_objectives` are explicit **soft
 suggestions** — player input wins when it diverges.
 
-## The conflict engine (v0.3)
+## The conflict engine (v0.3/v0.4)
 
 A cross-genre bookkeeping layer for scenes of tension — combat,
 debate, chase, negotiation, trial, cultivation-ordeal. The GM opens
@@ -147,14 +150,35 @@ back to "nothing happened" — `last_conflict_summary` preserves
 rendered into `current_scene.md` until a new `conflict_open` takes
 over.
 
-**Budget overshoot check.** `tools/lint_save.py` warns (not errors) when a
-frame has run past its `beat_budget` by 2 turns or more — usually a cue
-the GM forgot to resolve. `beat_budget` is set at `conflict_open`
-(default 4, range 3–6); remaining beats are derived from the current
-turn and `opened_turn`.
+**Pacing discipline (v0.4).** Every frame carries a `beat_budget`
+integer (3–6, default 4) set at `conflict_open` based on the scope
+of the scene — 3 for a brawl or short chase, 4 for general combat,
+5 for debate or negotiation, 6 for a siege. Remaining beats are
+derived on the fly as `beat_budget - (world.turn - opened_turn)`; no
+counter is stored, no patch mutates it. When `remaining` reaches 1,
+one of A/B/C must be a **decisive** (`收束型 / 一击定音`) move that
+could end the frame if it lands, and `current_scene.md` swaps the
+`势头 / Momentum` field for `收束在即 / Endgame`. At `remaining == 0`
+the turn should resolve (player wins, opposition wins, even + world
+change, or player disengages). One turn of overshoot is tolerated for
+a reveal that needs to play out; beyond that, `tools/lint_save.py`
+warns.
 
-Momentum is a discrete label, never a number. Keeps the engine off
-the numeric-combat-stat slope and keeps narration literary.
+Paired with the pacing budget is a **doubled beat density**: a turn
+plays the current beat through **two pivots** (action lands → first
+NPC reaction that changes the situation → complication on top) rather
+than one. What used to take two turns of micro-exchange
+(抢腕 → 藏针被拍偏 → 毒掌提起) now lands in a single turn.
+
+Outside conflicts, the GM may also compress time when the player's
+input is routine — travel, rest, shopping, waiting, montage. A goal
+like "I ride to 嘉兴" fast-forwards hours or days to the next point
+of tension instead of narrating every saddle check. Inside an active
+conflict frame this is explicitly forbidden — every turn there is one
+beat inside the frame.
+
+Momentum itself remains a discrete label, never a number. Keeps the
+engine off the numeric-combat-stat slope and keeps narration literary.
 
 See
 [`genre_packs/universal/prompts/gm_system_fragment.md`](./genre_packs/universal/prompts/gm_system_fragment.md)
@@ -202,6 +226,33 @@ is `render_save.py → lint_save.py → inspect_save.py`. The playbooks
 call these at the appropriate points.
 
 ## Changelog
+
+### v0.4
+
+- **Conflict pacing budget.** `ConflictFrame.beat_budget` (int, 3–6,
+  default 4) set once at `conflict_open`; remaining beats derived as
+  `beat_budget - (world.turn - opened_turn)` — no auto-decrement, no
+  stored counter, no patch contract to enforce. `tools/lint_save.py`
+  warns when a frame overshoots its budget by 2+ turns (replacing the
+  old fixed "10 turns" rule).
+- **Endgame HUD.** When remaining beats drop to ≤1,
+  `current_scene.md` swaps the conflict's momentum field for
+  `收束在即 / Endgame` regardless of the underlying `momentum` value.
+  At least one of A/B/C must be a `收束型 / 一击定音` (decisive) move.
+- **Beat density doubled.** A turn now plays the current beat through
+  **two pivots** — action lands, first NPC reaction that materially
+  changes the situation, complication on top — rather than one. What
+  used to take two turns of micro-exchange now lands in one.
+- **Time compression outside conflicts.** When the player writes a
+  goal instead of a step (e.g. "I ride to 嘉兴") and nothing in
+  `present_entities`, `active_threads`, or `novel_rules.md` makes the
+  routine fraught, the GM may fast-forward hours or days to the next
+  beat that needs a decision. Forbidden inside an active conflict
+  frame.
+- **First unittest module.** `tests/test_conflict_budget.py` — 17
+  stdlib `unittest` cases against the pacing schema, lint rule, and
+  render-side endgame override. Run with
+  `python -m unittest tests.test_conflict_budget`.
 
 ### v0.3
 
