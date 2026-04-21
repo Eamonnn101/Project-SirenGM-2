@@ -60,9 +60,12 @@ Semantics:
   Defaults to 4 if not specified in the open patch.
 - Legal range 3–6. Conflicts genuinely larger than 6 beats are split into
   sequential frames (resolve the first, open the next).
-- Decremented by 1 **automatically** each time a `conflict_update` patch
-  is accepted. The GM does NOT patch `beat_budget` directly inside
-  `conflict_update`; if they do, drop the field and log a divergence.
+- Remaining beats are **derived** on every read:
+  `remaining = beat_budget - (world.turn - opened_turn)`.
+  No stored counter and no engine that mutates the value. The field is set
+  once at `conflict_open` and never patched thereafter. If the GM
+  supplies `beat_budget` inside `conflict_update`, the field is
+  dropped and a divergence is logged.
 
 Recommended budget table (GM guidance, not schema-enforced):
 
@@ -93,8 +96,8 @@ Three edits inside the *Conflict frame* section:
 **Edit A** · New subsection at the end of *Conflict frame (load-bearing)*:
 
 > **Beat budget (load-bearing).** On `conflict_open`, set `beat_budget`
-> to 3–6 based on the conflict's scope (see guidance table). Each
-> `conflict_update` decrements it automatically.
+> to 3–6 based on the conflict's scope (see guidance table). Remaining
+> beats are derived on the fly as `beat_budget - (world.turn - opened_turn)`; you do not patch it yourself after open.
 >
 > - `beat_budget == 1`: at least one of A/B/C must be a concrete
 >   decisive move that would resolve the frame if it lands.
@@ -172,8 +175,9 @@ endgame threshold leaks into the HUD.
 ### 6. Playbook update
 
 `playbooks/play-turn.md` · *Conflict frame lifecycle* adds a short
-paragraph on `beat_budget` flow (set at open, auto-decrement on update,
-resolve expected at 0, 1-turn overshoot allowed, lint warns at -2).
+paragraph on `beat_budget` flow (set at open, not patched afterwards,
+remaining derived from `turn - opened_turn`, resolve expected at
+remaining==0, 1-turn overshoot allowed, lint warns at remaining<=-2).
 
 `CLAUDE.md` is not changed — this schema detail lives below the top-level
 operating schema.
@@ -195,8 +199,7 @@ operating schema.
 
 - Unit: `ConflictFrame` accepts `beat_budget` 3–6, rejects 2 and 7,
   defaults to 4 when absent.
-- Unit: patch application decrements `beat_budget` on `conflict_update`;
-  ignores GM-supplied `beat_budget` inside `conflict_update`.
+- Unit: `beats_remaining(current_turn)` computes `beat_budget - (current_turn - opened_turn)` correctly at the open turn, during countdown, at zero, and into negative overshoot; `is_endgame` returns True for remaining ≤ 1.
 - Unit: `lint_save.py` warns at `beat_budget <= -2` and not before;
   info-logs early resolve.
 - Unit: `render_save.py` emits `收束在即 / Endgame` when
