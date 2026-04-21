@@ -90,6 +90,10 @@ class ConflictFrame(BaseModel):
     Cross-genre: `kind` is free-form (combat, debate, chase, trial, ...).
     Momentum is a discrete label, never a number — consistent with the
     no-numeric-combat-stats guardrail.
+
+    `beat_budget` is the initial pacing budget set at conflict_open and
+    never changes thereafter. Remaining beats are derived from the
+    current world turn via `beats_remaining`.
     """
 
     model_config = ConfigDict(extra="forbid")
@@ -100,6 +104,16 @@ class ConflictFrame(BaseModel):
     momentum: ConflictMomentum = "setup"
     escalation_notes: list[str] = Field(default_factory=list)
     opened_turn: int
+    beat_budget: int = Field(
+        default=4,
+        ge=3,
+        le=6,
+        description=(
+            "Initial pacing budget set at conflict_open. "
+            "Remaining beats = beat_budget - (current_turn - opened_turn). "
+            "Lint warns when remaining drops below -1."
+        ),
+    )
 
     @model_validator(mode="after")
     def _validate_sides(self) -> "ConflictFrame":
@@ -109,6 +123,14 @@ class ConflictFrame(BaseModel):
         if len(set(labels)) != len(labels):
             raise ValueError(f"ConflictFrame.sides has duplicate labels: {labels}")
         return self
+
+    def beats_remaining(self, current_turn: int) -> int:
+        """Beats left before budget is exhausted. Can go negative on overshoot."""
+        return self.beat_budget - (current_turn - self.opened_turn)
+
+    def is_endgame(self, current_turn: int) -> bool:
+        """True when the HUD should display endgame; i.e. remaining <= 1."""
+        return self.beats_remaining(current_turn) <= 1
 
 
 class ConflictSummary(BaseModel):
