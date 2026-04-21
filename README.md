@@ -147,9 +147,11 @@ back to "nothing happened" — `last_conflict_summary` preserves
 rendered into `current_scene.md` until a new `conflict_open` takes
 over.
 
-**Staleness check.** `tools/lint_save.py` warns (not errors) when a
-frame has been open for more than 10 turns — usually a cue the GM
-forgot to resolve or should narrow the frame.
+**Budget overshoot check.** `tools/lint_save.py` warns (not errors) when a
+frame has run past its `beat_budget` by 2 turns or more — usually a cue
+the GM forgot to resolve. `beat_budget` is set at `conflict_open`
+(default 4, range 3–6); remaining beats are derived from the current
+turn and `opened_turn`.
 
 Momentum is a discrete label, never a number. Keeps the engine off
 the numeric-combat-stat slope and keeps narration literary.

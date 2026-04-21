@@ -78,16 +78,16 @@ Recommended budget table (GM guidance, not schema-enforced):
 
 Countdown behavior:
 
-- `beat_budget == 1` — last beat imminent. GM MUST offer at least one
+- `remaining == 1` — last beat imminent. GM MUST offer at least one
   decisive (收束型) A/B/C option. HUD momentum column switches to
   `收束在即 / Endgame`.
-- `beat_budget == 0` — this turn SHOULD emit `conflict_resolve`.
+- `remaining == 0` — this turn SHOULD emit `conflict_resolve`.
   Acceptable outcomes: player wins, opposition wins, even +
   `world_change`, player disengages. A disengagement still counts as
   resolve.
-- `beat_budget == -1` — one-turn overshoot allowed if a just-revealed
+- `remaining == -1` — one-turn overshoot allowed if a just-revealed
   development genuinely needs to play out; then resolve.
-- `beat_budget <= -2` — lint warns.
+- `remaining <= -2` — lint warns.
 
 ### 2. GM prompt soft guidance — `gm_system_fragment.md`
 
@@ -99,12 +99,12 @@ Three edits inside the *Conflict frame* section:
 > to 3–6 based on the conflict's scope (see guidance table). Remaining
 > beats are derived on the fly as `beat_budget - (world.turn - opened_turn)`; you do not patch it yourself after open.
 >
-> - `beat_budget == 1`: at least one of A/B/C must be a concrete
+> - `remaining == 1`: at least one of A/B/C must be a concrete
 >   decisive move that would resolve the frame if it lands.
-> - `beat_budget == 0`: this turn SHOULD emit `conflict_resolve`
+> - `remaining == 0`: this turn SHOULD emit `conflict_resolve`
 >   (player wins / opposition wins / even + world_change / player
 >   disengages — disengagement counts as resolve).
-> - `beat_budget == -1` allowed only when a just-landed reveal truly
+> - `remaining == -1` allowed only when a just-landed reveal truly
 >   needs one more beat; then resolve. Lint warns at `<= -2`.
 
 **Edit B** · Rewrite *Beat density* from one-pivot-per-turn to two:
@@ -127,7 +127,7 @@ Three edits inside the *Conflict frame* section:
 
 **Edit C** · Options constraint addendum:
 
-> While a frame is active AND `beat_budget <= 1`, one of A/B/C MUST be a
+> While a frame is active AND `beats_remaining(current_turn) <= 1`, one of A/B/C MUST be a
 > 收束型 move (could resolve the frame this turn if it lands). Generic
 > "press the advantage" is not enough; the option must describe the
 > specific decisive action.
@@ -154,7 +154,7 @@ New section in `genre_packs/universal/style_guide.md`:
 When rendering the conflict HUD line:
 
 - Read `current_conflict.beat_budget`.
-- If `beat_budget <= 1`, force the momentum column to
+- If `beats_remaining(current_turn) <= 1`, force the momentum column to
   `收束在即` (zh) / `Endgame` (en), overriding the underlying momentum
   label.
 - Otherwise render normally per the existing momentum table.
@@ -166,11 +166,8 @@ endgame threshold leaks into the HUD.
 
 - **Remove** the existing rule "conflict active > 10 turns → warn".
 - **Add**: if `current_conflict` is present and
-  `beat_budget <= -2` → warn ("conflict has overshot budget by 2+ beats,
+  `remaining <= -2` → warn ("conflict has overshot budget by 2+ beats,
   should resolve").
-- **Add** (info only, not a warning): if the last resolved conflict
-  summary shows resolve happened with `beat_budget > 2` remaining → info
-  message ("conflict resolved early") for observability; no action.
 
 ### 6. Playbook update
 
@@ -200,10 +197,9 @@ operating schema.
 - Unit: `ConflictFrame` accepts `beat_budget` 3–6, rejects 2 and 7,
   defaults to 4 when absent.
 - Unit: `beats_remaining(current_turn)` computes `beat_budget - (current_turn - opened_turn)` correctly at the open turn, during countdown, at zero, and into negative overshoot; `is_endgame` returns True for remaining ≤ 1.
-- Unit: `lint_save.py` warns at `beat_budget <= -2` and not before;
-  info-logs early resolve.
+- Unit: `lint_save.py` warns at `remaining <= -2` and not before.
 - Unit: `render_save.py` emits `收束在即 / Endgame` when
-  `beat_budget <= 1`; normal momentum otherwise.
+  `remaining <= 1`; normal momentum otherwise.
 - Manual: replay a chase + combat scene similar to the Li Mochou log
   and confirm the chase resolves in ≤4 turns and the combat in ≤4 turns.
 
