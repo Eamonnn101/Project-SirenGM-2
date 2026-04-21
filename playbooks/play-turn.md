@@ -181,11 +181,19 @@ courtroom, …), picked fresh per frame.
   side's `want` is one line; include the PC's side (`members`
   contains the PC's character slug or the literal `player`).
   `momentum` on opening is almost always `setup`.
+  Additionally set `beat_budget` on open based on the conflict's
+  scope (3–6, default 4). See *Beat budget* in
+  `genre_packs/universal/prompts/gm_system_fragment.md` for the
+  per-kind guidance table.
 - **Update (`conflict_update`)** — every turn the frame is live,
   emit at least `momentum` (even if it stayed the same) and, when a
   pivotal beat landed, an `escalation_note`. Track costs with
   `side_updates[label].paid_add`. Keep each entry short — a bullet,
   not a paragraph.
+  Do NOT patch `beat_budget` here — it is set once at open and
+  thereafter derived (`beat_budget - (turn - opened_turn)`).
+  Patches that include `beat_budget` inside `conflict_update` drop
+  that field and log a divergence.
 - **Resolve (`conflict_resolve`)** — emit the turn the stakes are
   answered or the player walks away. Always combine with the
   writebacks the outcome implies: `hidden_truths_append` for
@@ -196,9 +204,11 @@ courtroom, …), picked fresh per frame.
   whichever label fits) and `world_change` stating the abandonment
   — do not leave the frame open.
 
-If the frame sits open for more than ~10 turns, `tools/lint_save.py`
-will warn. That is a cue to resolve or narrow the frame, not a
-hard error.
+When `remaining == 1` (i.e. `turn - opened_turn == beat_budget - 1`),
+one A/B/C option must be a decisive (收束型) move and the HUD shows
+`收束在即 / Endgame`. When `remaining == 0`, the turn SHOULD resolve
+the frame. One-turn overshoot is allowed when a reveal needs to
+play out. `tools/lint_save.py` warns when `remaining <= -2`.
 
 ## Step 3 · Persist
 
