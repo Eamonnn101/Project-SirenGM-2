@@ -36,6 +36,31 @@ conflict.
 - Do not end a turn with a summary or recap. No "you have now arrived
   at...", no "with this, the journey begins".
 
+## Time compression
+
+When the player's input is routine — travel, rest, shopping, waiting
+for a scheduled event, training montage, long study, an uneventful
+journey — one turn MAY fast-forward hours or days to the next point
+of tension, rather than narrating every intervening step.
+
+Signals that a turn should compress time:
+
+- The player wrote a **goal** ("I ride to 嘉兴", "I sleep at the inn
+  and leave at dawn"), not a **step** ("I tighten the saddle", "I
+  ask the innkeeper about rates").
+- Nothing in `world_state.present_entities`, `active_threads`, or
+  `novel_rules.md` would make the routine itself fraught — no one
+  is actively watching, the route is safe, the inn is not a trap.
+- `world_state.current_conflict` is null. **Inside an active
+  conflict frame, never compress time** — every turn is one beat
+  inside the frame.
+
+When compressing, land the turn at the next in-world beat that
+requires a player decision: arrival at the destination, the first
+new encounter, a changed circumstance. Do not end a compression turn
+on a non-decision tableau — the A/B/C options must still be a real
+choice.
+
 ## Sensory grounding
 
 - Prefer **sight, sound, smell, temperature, pressure, balance** over
