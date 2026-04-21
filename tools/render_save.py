@@ -91,6 +91,7 @@ LABELS: dict[str, dict[str, str]] = {
         "last_conflict": "上一场冲突",
         "last_conflict_outcome": "结果",
         "last_conflict_resolved_at": "结束于回合",
+        "conflict_momentum_endgame": "收束在即",
     },
     "en": {
         "current_scene": "Current Scene",
@@ -126,6 +127,7 @@ LABELS: dict[str, dict[str, str]] = {
         "last_conflict": "Last Conflict",
         "last_conflict_outcome": "Outcome",
         "last_conflict_resolved_at": "Resolved on turn",
+        "conflict_momentum_endgame": "Endgame",
     },
 }
 
@@ -244,7 +246,7 @@ def render_current_scene(save: Save, L: dict[str, str]) -> str:
         for o in w.current_objectives:
             lines.append(f"  - {o}")
     if w.current_conflict is not None:
-        lines += _render_conflict_block(w.current_conflict, L)
+        lines += _render_conflict_block(w.current_conflict, L, w.turn)
     elif w.last_conflict_summary is not None:
         lines += _render_last_conflict_block(w.last_conflict_summary, L)
     if save.session_log:
@@ -255,11 +257,15 @@ def render_current_scene(save: Save, L: dict[str, str]) -> str:
     return "\n".join(lines) + "\n"
 
 
-def _render_conflict_block(conflict, L: dict[str, str]) -> list[str]:
+def _render_conflict_block(conflict, L: dict[str, str], current_turn: int) -> list[str]:
     lines: list[str] = ["", f"## {L['current_conflict']}", ""]
     lines.append(f"- **{L['conflict_stake']}**: {conflict.stake}")
     lines.append(f"- **{L['conflict_kind']}**: {conflict.kind}")
-    lines.append(f"- **{L['conflict_momentum']}**: {conflict.momentum}")
+    if conflict.is_endgame(current_turn):
+        momentum_display = L["conflict_momentum_endgame"]
+    else:
+        momentum_display = conflict.momentum
+    lines.append(f"- **{L['conflict_momentum']}**: {momentum_display}")
     lines.append(f"- **{L['conflict_sides']}**:")
     for side in conflict.sides:
         paid = ", ".join(side.paid) if side.paid else "—"

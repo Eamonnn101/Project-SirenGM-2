@@ -129,5 +129,38 @@ class TestLintConflictFrame(unittest.TestCase):
         self.assertIn("overshoot", issues[0].lower())
 
 
+class TestRenderConflictEndgame(unittest.TestCase):
+    """render_save should show 收束在即 / Endgame in the momentum field when beats_remaining <= 1."""
+
+    def _render(self, conflict, current_turn: int, lang: str):
+        from tools.render_save import _render_conflict_block, _labels_for
+        L = _labels_for(lang)
+        return "\n".join(_render_conflict_block(conflict, L, current_turn))
+
+    def test_zh_normal_momentum_when_not_endgame(self):
+        frame = _make_frame(opened_turn=0, beat_budget=4, momentum="even")
+        out = self._render(frame, current_turn=2, lang="zh")  # remaining=2
+        self.assertIn("势头", out)
+        self.assertIn("even", out)
+        self.assertNotIn("收束在即", out)
+
+    def test_zh_endgame_overrides_at_remaining_1(self):
+        frame = _make_frame(opened_turn=0, beat_budget=4, momentum="even")
+        out = self._render(frame, current_turn=3, lang="zh")  # remaining=1
+        self.assertIn("收束在即", out)
+        self.assertNotIn("- **势头**: even", out)
+
+    def test_zh_endgame_at_remaining_0(self):
+        frame = _make_frame(opened_turn=0, beat_budget=4, momentum="reversal_imminent")
+        out = self._render(frame, current_turn=4, lang="zh")  # remaining=0
+        self.assertIn("收束在即", out)
+
+    def test_en_endgame_label(self):
+        frame = _make_frame(opened_turn=0, beat_budget=4, momentum="even")
+        out = self._render(frame, current_turn=3, lang="en")  # remaining=1
+        self.assertIn("Endgame", out)
+        self.assertNotIn("Momentum**: even", out)
+
+
 if __name__ == "__main__":
     unittest.main()
