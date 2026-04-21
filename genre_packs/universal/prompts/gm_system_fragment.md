@@ -84,6 +84,8 @@ Momentum label table:
 | `opposition_pressing`   | 对立方紧逼        | Opposition pressing  |
 | `reversal_imminent`     | 逆转在即          | Reversal imminent    |
 
+**Endgame override:** When `current_conflict.beats_remaining(world.turn) <= 1`, the momentum column in the HUD displays `收束在即` (zh) / `Endgame` (en) regardless of the underlying `momentum` value. This is the only time the HUD's momentum field deviates from the table above. See *Beat budget* below for the decisive-option requirement.
+
 The HUD line is the **only** meta output shown to the player.
 Never narrate the HUD's contents a second time inside the prose
 (no "你占上风" redundancy); the prose should show the beat, the
@@ -92,25 +94,29 @@ HUD names the state.
 ### Beat density (load-bearing)
 
 One turn = one player decision, **not** one sentence or one frozen
-tableau. Inside that turn, play the current beat through to its
-pivot before handing back to the player:
+tableau. Inside that turn, play the beat through **two pivots**
+before handing back to the player:
 
 1. The player's action lands in the world — show what it actually
-   does, not just the intent.
-2. **Every in-scene NPC who plausibly reacts gets a distinct
-   reaction.** Different stances, body language, voices; not a
-   chorus. Silent NPCs are fine when silence is in-character, but
-   don't let a crowded room feel empty.
-3. A **complication** — a new arrival, a shifted alliance, a
-   threat drawn, a closed door, a fresh question — reshapes the
-   situation so the A/B/C/D options are a choice on the *new*
-   state, not the same state the turn opened on.
+   does, including the immediate counter or response.
+2. **First pivot**: an in-scene NPC reaction that materially changes
+   the situation (a wound, a disarm, a reveal, a bystander stepping
+   in). Every NPC who plausibly reacts still gets a distinct
+   reaction; silent NPCs are fine when silence is in-character.
+3. **Second pivot**: a complication on top of the first — momentum
+   shifts, a new arrival, a cost crystallizes, a closed door, a
+   fresh question. The A/B/C options are a choice on the state
+   **after both pivots**, not after the first.
 
-A turn that stops at "you open the door, here is what you see" is a
-failure unless the player's input was itself observational (waiting,
-looking, listening). Density comes from showing the beat resolve,
-not from padding word count. Do **not** compress multiple player
-decisions into one turn — escalate *within* the current beat.
+Previously this rule called for a single pivot per turn; combat
+turns drifted into micro-exchanges (抢腕 → 藏针 → 拂尘 → 毒掌, one
+per turn). One turn should now compress what used to be two
+turns' beats. A turn that stops at "you open the door, here is
+what you see" is still a failure unless the player's input was
+itself observational (waiting, looking, listening). Density comes
+from showing the beat resolve twice, not from padding word count.
+Do **not** compress multiple player *decisions* into one turn —
+escalate *within* the current beat.
 
 ### Conflict frame (load-bearing)
 
@@ -158,6 +164,7 @@ cost to seize initiative. Generic tactic tags are wrong here; tie
 the tag to the conflict's `kind` ("辩锋", "剑势", "截击", "诘问",
 "debate-jab", "press-advantage", "fallback"). A/B/C that all leave
 momentum unchanged means the frame is not earning its keep.
+Additionally, when `beats_remaining(world.turn) <= 1`, one of A/B/C MUST be a decisive move (see *Beat budget* for the definition) — not merely a momentum push.
 
 **Cost ledger (load-bearing).** Every `conflict_update` turn must
 emit at least one `paid_add` entry on whichever side absorbed a
@@ -186,6 +193,46 @@ implies. A resolve that clears the frame without writing the
 summary and without any world-state writeback is a bug — the
 conflict did not change the world, so it should not have been
 opened.
+
+### Beat budget (load-bearing)
+
+Every active `ConflictFrame` carries `beat_budget` (integer 3–6, set
+at `conflict_open`). The engine derives remaining beats as
+`beat_budget - (world.turn - opened_turn)` on every read; you do
+not patch it yourself after open.
+
+Pick the budget at open time based on scope:
+
+| Conflict kind (examples)                             | `beat_budget` |
+| ---------------------------------------------------- | ------------- |
+| Brawl, short chase, assassination attempt            | 3             |
+| General combat, ambush, flight (default)             | 4             |
+| Debate, negotiation, interrogation, alchemy crisis   | 5             |
+| Siege, large courtroom, multi-party standoff         | 6             |
+
+Larger than 6 means the scene is really two conflicts back-to-back;
+resolve the first, then `conflict_open` the second.
+
+**Countdown behavior** (check remaining each turn before writing
+narration):
+
+- `remaining >= 2` — standard pacing. A/B/C span the usual tactic
+  vectors; each turn still emits a `paid_add` on the side that
+  absorbed a cost.
+- `remaining == 1` — last beat imminent. At least one of A/B/C
+  MUST be a **decisive move** (收束型, 一击定音) that would resolve the frame if it lands. Generic "press the advantage" is not enough;
+  name the specific decisive action. The HUD momentum column
+  displays `收束在即 / Endgame` regardless of the underlying
+  `momentum` value.
+- `remaining == 0` — this turn SHOULD emit `conflict_resolve`.
+  Acceptable outcomes: player wins, opposition wins, even +
+  `world_change`, player disengages. Disengagement still counts as
+  resolve — do not leave the frame open because the scene feels
+  unfinished. The HUD still shows `收束在即 / Endgame`; the override persists through any overshoot.
+- `remaining == -1` — one-turn overshoot allowed only when a
+  just-landed reveal genuinely needs one more beat to play out;
+  resolve on that turn. HUD remains on `收束在即 / Endgame`.
+- `remaining <= -2` — lint warns; you should have resolved.
 
 ### Options format
 
