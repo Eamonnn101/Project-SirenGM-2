@@ -209,20 +209,19 @@ def _lint_slugs(save, pack) -> list[str]:
     return issues
 
 
-STALE_CONFLICT_THRESHOLD = 10
-
-
 def _lint_conflict_frame(save) -> list[str]:
     conflict = save.world.current_conflict
     if conflict is None:
         return []
     issues: list[str] = []
-    age = save.world.turn - conflict.opened_turn
-    if age > STALE_CONFLICT_THRESHOLD:
+    remaining = conflict.beats_remaining(save.world.turn)
+    if remaining <= -2:
+        overshoot = -remaining
         issues.append(
-            f"current_conflict {conflict.id!r} is {age} turns old "
-            f"(opened turn {conflict.opened_turn}, now {save.world.turn}); "
-            f"resolve it or revise the frame"
+            f"current_conflict {conflict.id!r} overshoots beat_budget "
+            f"by {overshoot} turns (budget {conflict.beat_budget}, "
+            f"opened turn {conflict.opened_turn}, now {save.world.turn}); "
+            f"resolve or revise the frame"
         )
     return issues
 

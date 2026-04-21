@@ -81,5 +81,53 @@ class TestBeatsRemaining(unittest.TestCase):
         self.assertTrue(frame.is_endgame(current_turn=9))   # remaining=0
 
 
+class TestLintConflictFrame(unittest.TestCase):
+    """Lint should warn only when the conflict overshoots beat_budget by 2+."""
+
+    def _make_save_with_frame(self, *, opened_turn: int, current_turn: int, budget: int):
+        from tools._models import PlayerState, WorldState, Save, RelationshipState, OpenLoops
+
+        frame = _make_frame(
+            opened_turn=opened_turn,
+            beat_budget=budget,
+        )
+        world = WorldState(
+            turn=current_turn,
+            current_location="emergent:test_room",
+            present_entities=[],
+            player=PlayerState(name="Test", slug="player"),
+            current_conflict=frame,
+        )
+        return Save(
+            save_id="save_test",
+            pack_name="test_pack",
+            world=world,
+            relationships=RelationshipState(),
+            open_loops=OpenLoops(),
+        )
+
+    def test_no_warning_when_within_budget(self):
+        from tools.lint_save import _lint_conflict_frame
+        save = self._make_save_with_frame(opened_turn=5, current_turn=8, budget=4)  # age=3, remaining=1
+        self.assertEqual(_lint_conflict_frame(save), [])
+
+    def test_no_warning_at_budget_exhausted(self):
+        from tools.lint_save import _lint_conflict_frame
+        save = self._make_save_with_frame(opened_turn=5, current_turn=9, budget=4)  # age=4, remaining=0
+        self.assertEqual(_lint_conflict_frame(save), [])
+
+    def test_no_warning_at_one_turn_overshoot(self):
+        from tools.lint_save import _lint_conflict_frame
+        save = self._make_save_with_frame(opened_turn=5, current_turn=10, budget=4)  # age=5, remaining=-1
+        self.assertEqual(_lint_conflict_frame(save), [])
+
+    def test_warning_at_two_turn_overshoot(self):
+        from tools.lint_save import _lint_conflict_frame
+        save = self._make_save_with_frame(opened_turn=5, current_turn=11, budget=4)  # age=6, remaining=-2
+        issues = _lint_conflict_frame(save)
+        self.assertEqual(len(issues), 1)
+        self.assertIn("overshoot", issues[0].lower())
+
+
 if __name__ == "__main__":
     unittest.main()
