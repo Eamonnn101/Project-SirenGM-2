@@ -1,6 +1,6 @@
-"""HUD rendering helpers for the v0.4 progression layer.
+"""HUD rendering helpers for the v0.5 progression layer.
 
-Produces the two-layer text HUD described in the v0.4 plan:
+Produces the two-layer text HUD described in the v0.5 plan:
 
 - `render_compact_turn_hud`  — Layer A, written at the top of
   `current_scene.md` every turn.

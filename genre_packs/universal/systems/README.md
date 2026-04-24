@@ -4,7 +4,7 @@ name: systems_readme
 
 # Universal · Systems
 
-Shared, genre-agnostic mechanic **seeds** for the v0.4 progression
+Shared, genre-agnostic mechanic **seeds** for the v0.5 progression
 layer. Novel-specific labels and flavor are not defined here — each
 user pack's `packs/<name>/progression_rules.md` re-themes these seeds
 at ingest time.

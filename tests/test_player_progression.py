@@ -1,4 +1,4 @@
-"""Tests for the v0.4 progression layer: artifacts, innate/destiny traits,
+"""Tests for the v0.5 progression layer: artifacts, innate/destiny traits,
 stage index, health ladder, death flow, and per-pack meta progression."""
 
 from __future__ import annotations

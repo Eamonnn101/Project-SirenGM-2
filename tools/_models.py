@@ -28,7 +28,7 @@ ConflictMomentum = Literal[
     "reversal_imminent",
 ]
 
-# Progression / build layer (v0.4 continuation: artifacts, traits, stages, death)
+# Progression / build layer (v0.5: artifacts, traits, stages, death)
 HealthState = Literal["healthy", "hurt", "badly_hurt", "critical", "dead"]
 ArtifactArchetype = Literal["insight", "bond_rescue", "companion"]
 TraitKind = Literal["innate", "destiny"]
@@ -188,7 +188,7 @@ class PlayerState(BaseModel):
         description="Novel-specific attributes the renderer surfaces verbatim.",
     )
 
-    # --- Progression layer (v0.4 continuation) -------------------------
+    # --- Progression layer (v0.5) -------------------------
     stage_index: int = Field(
         default=0,
         ge=0,

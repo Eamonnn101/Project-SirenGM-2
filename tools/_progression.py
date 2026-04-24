@@ -1,7 +1,7 @@
 """Progression-layer helpers: survival-trigger precedence, draft bias,
 and meta-progress merging.
 
-These functions are the deterministic, testable core of the v0.4
+These functions are the deterministic, testable core of the v0.5
 progression layer. The playbooks and GM prompts reference them, but
 the agent does not need to call them on every turn — they exist so
 lint/tests/inspection can reason about the same rules the agent
@@ -47,7 +47,7 @@ def resolve_survival_trigger(
     """Return the trigger that replaces a `player_health_state: 'dead'` patch,
     or None if the fatal patch should be committed as terminal.
 
-    Precedence (locked per the v0.4 plan + gm_system_fragment.md):
+    Precedence (locked per the v0.5 plan + gm_system_fragment.md):
 
       1. Artifact `bond_rescue` archetype, unused  → critical, artifact used.
       2. Destiny `not_meant_to_die`,     not exhausted → critical, exhausted.

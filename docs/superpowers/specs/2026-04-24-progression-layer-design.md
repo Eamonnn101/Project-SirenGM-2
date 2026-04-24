@@ -1,11 +1,11 @@
 # Progression Layer — Artifact + Innate + Destiny + Death + Light Meta
 
 Date: 2026-04-24
-Status: Implemented, shipping under v0.4
+Status: Implemented, shipping as v0.5
 
 ## Problem
 
-The pacing-discipline tranche of v0.4 made conflicts feel decisive but
+v0.4 (pacing discipline) made conflicts feel decisive but
 left the **run shape** open-ended. There was no build, no
 breakthrough, no real death — every save was a flat sequence of
 turns until the user lost interest. The play-test ask was: borrow
@@ -207,8 +207,8 @@ both languages.
 Locked during planning (recorded in
 `/Users/eamon/.claude/plans/sirengm-2-v0-4-staged-bunny.md`):
 
-1. Ship under existing **v0.4** label (pacing + progression
-   bundled). No v0.5 bump.
+1. Ship as **v0.5** — pacing (v0.4) and progression are distinct
+   feature tranches and deserve separate release tags.
 2. Meta location: `saves/<pack>/meta_progress.json` (sibling of
    save dirs; survives re-ingest).
 3. Innate picks: 3 **distinct archetypes** per run.

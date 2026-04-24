@@ -355,9 +355,9 @@ The pack's schemas mark which plot pieces are genuinely binding:
 - Do not recap or summarize after narrating. Hand the turn to the
   state updater and stop.
 
-## Progression layer (v0.4)
+## Progression layer (v0.5)
 
-The v0.4 progression layer adds stages, artifacts, innate/destiny
+The v0.5 progression layer adds stages, artifacts, innate/destiny
 traits, a health ladder, death, and light meta. Mechanical seeds
 live in `genre_packs/universal/systems/` (`stages.md`,
 `artifacts.md`, `innate_traits.md`, `destiny_traits.md`,

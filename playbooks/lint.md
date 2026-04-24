@@ -53,7 +53,7 @@ This checks:
 - Every slug in `current_location`, `present_entities`, inventory, and
   `relationships.by_slug` exists in the referenced pack (or starts with
   `emergent:`).
-- **Progression invariants** (v0.4):
+- **Progression invariants** (v0.5):
   - After turn 0, `player.innate_traits` must be exactly 3 entries
     with 3 distinct universal archetype keys.
   - After turn 0, `player.artifact` must be set.
