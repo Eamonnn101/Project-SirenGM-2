@@ -28,15 +28,29 @@ Before reading the user's turn input, load:
 5. `packs/<pack>/novel_rules.md` — the novel-specific power system,
    social order, tech level, tone, hard canon. This file is
    load-bearing; read it in full on every turn.
-6. `packs/<pack>/canon_guardrails.md` — any novel-specific overrides
+6. `packs/<pack>/progression_rules.md` — novel-themed stage labels,
+   per-stage breakthrough triggers, artifact/innate/destiny
+   instances, health-ladder wording. Load-bearing; read it in full
+   on every turn (same rhythm as `novel_rules.md`).
+7. `packs/<pack>/canon_guardrails.md` — any novel-specific overrides
    on top of the universal guardrails.
-7. For each slug in `world_state.present_entities` and
+8. `saves/<pack>/meta_progress.json` (if present) — lets the turn
+   output know the light meta counters for the compact HUD and
+   informs unseen-first draft bias at breakthrough time.
+9. For each slug in `world_state.present_entities` and
    `current_location`, read its entity page.
-8. For each `active_threads[*].id` that maps to an arc slug, read
-   that arc page (including its `flexibility` field).
-9. `genre_packs/universal/style_guide.md`,
-   `genre_packs/universal/canon_guardrails.md`, and
-   `genre_packs/universal/prompts/gm_system_fragment.md`.
+10. For each `active_threads[*].id` that maps to an arc slug, read
+    that arc page (including its `flexibility` field).
+11. `genre_packs/universal/style_guide.md`,
+    `genre_packs/universal/canon_guardrails.md`, and
+    `genre_packs/universal/prompts/gm_system_fragment.md` (which
+    covers the progression layer rules).
+12. `genre_packs/universal/systems/*.md` as needed — the mechanic
+    seeds for stages, artifacts, traits, health, and meta.
+13. For a breakthrough turn, also read
+    `genre_packs/universal/prompts/breakthrough_pick.md`. For a
+    death/completion turn, also read
+    `genre_packs/universal/prompts/death_coda.md`.
 
 **Never** scrape `current_scene.md` or `session_log.md` for scene state.
 Those are display surfaces; they can drift. The JSON files are canonical.
@@ -151,6 +165,30 @@ JSON object with these optional top-level keys:
   `open_loops_add`, `inventory_*` the outcome implies. A resolve
   that writes no world-state writeback is a bug: the conflict did
   not change the world and should not have been opened.
+- `player_artifact_set` — `PlayerArtifact` dict. Accepted **only**
+  when `turn == 0` or when `player.artifact is None` (i.e. during
+  new-game Step 1.5). Rejected with a divergence otherwise.
+- `player_innate_traits_set` — list of exactly 3 `Trait` dicts
+  (each `kind: "innate"`, 3 distinct archetype keys). Accepted
+  only when `turn == 0` (new-game Step 1.6). Rejected otherwise.
+- `player_stage_advance` — `{new_index, new_label}`. Must advance
+  `world_state.player.stage_index` by exactly 1, up to 5. Triggers
+  the breakthrough flow (see § Breakthrough turn below). Rejected
+  with a divergence if `new_index != stage_index + 1` or
+  `new_index > 5`.
+- `player_destiny_trait_add` — single `Trait` dict with `kind:
+  "destiny"` and `source_stage == stage_index`. Rejected if a
+  destiny with that `source_stage` already exists, if the
+  archetype is already present on the player, or if the archetype
+  key is not one of the 12 universal destiny seeds.
+- `player_trait_exhaust` — `{slug}`. Flips `exhausted: true` on the
+  named destiny trait. Idempotent. Used when a once-per-run
+  ability (`not_meant_to_die`, `last_barrier`, `last_stand`, etc.)
+  fires.
+- `player_health_state` — `HealthState` (`healthy`/`hurt`/
+  `badly_hurt`/`critical`/`dead`). Setting `"dead"` routes
+  through **survival-trigger precedence** before becoming
+  terminal. See § Health ladder + death below.
 - `divergence` — `{reason, detail}` to append to `divergences.jsonl` when
   the narration implied something the patch can't faithfully encode.
 
@@ -209,6 +247,77 @@ one A/B/C option must be a decisive (收束型) move and the HUD shows
 `收束在即 / Endgame`. When `remaining == 0`, the turn SHOULD resolve
 the frame. One-turn overshoot is allowed when a reveal needs to
 play out. `tools/lint_save.py` warns when `remaining <= -2`.
+
+### Breakthrough turn (stage advance)
+
+When the current climactic beat matches one of the per-stage
+triggers in `progression_rules.md` §2, emit `player_stage_advance`
+in the turn's patch. Rules:
+
+- Max 5 advances per run. Never more than one per turn. No
+  regression.
+- Only on a climactic beat. Not during small talk, travel, or
+  routine logistics.
+- The turn's output replaces A/B/C/D with the **Breakthrough
+  block** (`genre_packs/universal/prompts/breakthrough_pick.md`):
+  short narration (1–3 paragraphs) of the breakthrough, then the
+  Unicode-boxed pick block with 3 destiny options + fixed D
+  fallback.
+- The player's next turn patches `player_destiny_trait_add` (or
+  no-op on the D fallback). Resume normal A/B/C/D play after that.
+
+Destiny options are drawn via `destiny_draw_order(meta,
+already_picked_in_run)` in `tools/_progression.py` — unseen-first
+bias against `meta.seen_destiny_archetypes`, filtered to exclude
+archetypes already on the player.
+
+### Health ladder + death
+
+`world_state.player.health_state` is the 5-state narrative health
+ladder (`healthy → hurt → badly_hurt → critical → dead`). Set it
+via `player_health_state: <state>` whenever the narration implies
+a move.
+
+- Adjacent moves are the common case. Skips are allowed only when
+  the prose clearly stages them.
+- `critical` requires **mandatory priority handling on the next
+  turn**: the prose centers on the danger, and A/B/C/D center on
+  the crisis. It is **not** a 1-turn "recover or die" timer —
+  genre-appropriate consequence timing (2–3 beats for a poison, a
+  contested scene for a bleed-out) is allowed as long as the
+  danger stays visible in every intervening turn.
+
+**Survival-trigger precedence** (load-bearing). Before committing
+a `player_health_state: "dead"` patch as terminal, check these in
+order. Any one firing replaces the fatal patch with `health_state
+→ critical`, marks the artifact/trait used/exhausted, and the
+prose shows the trigger firing. The turn is **not** terminal.
+
+1. **Artifact `bond_rescue`**, not yet used.
+2. **Destiny `not_meant_to_die`**, not exhausted.
+3. **Destiny `last_barrier`**, not exhausted, and only on the
+   specific transition `critical → dead`. Grants one extra
+   buffer turn at `critical`.
+
+No other MVP trigger prevents death. Implementation is in
+`tools/_progression.py :: resolve_survival_trigger`; the GM must
+narrate in the same order.
+
+If none applies → **terminal death flow**. The turn's output
+replaces A/B/C/D with the **Run-end block**
+(`genre_packs/universal/prompts/death_coda.md`): short coda
+narration + the Unicode-boxed block. The turn also writes
+`saves/<pack>/<save_id>/run_summary.md` and updates
+`saves/<pack>/meta_progress.json` via
+`tools/_progression.py :: merge_run_into_meta(outcome="death")`.
+Full procedure in `playbooks/death-and-restart.md`.
+
+### Clean completion turn
+
+When `stage_index == 5` AND the final climactic beat has landed,
+the agent emits the Run-end block with `outcome="completion"`.
+`runs_finished` bumps; no `DeathRecord`. The save is retired but
+not terminal-via-death. See `playbooks/death-and-restart.md`.
 
 ## Step 3 · Persist
 

@@ -25,6 +25,12 @@ Exit 0 = clean. Exit 1 = issues listed on stdout. Categorize issues:
 - **Genre purity violations** (novel-specific content in the universal
   genre pack) — move it into the user pack's `novel_rules.md`. Genre
   packs are templates, never novel data.
+- **Missing `progression_rules.md` sections** — the file must
+  contain all 7 required H2 sections (stages, breakthrough
+  triggers per stage, artifact archetypes, innate archetypes,
+  destiny seeds, health ladder wording, breakthrough voice). Add
+  the missing sections per `genre_packs/universal/systems/` +
+  `genre_packs/universal/prompts/ingest_draft_system.md`.
 
 Do not silence lint by editing `tools/lint_pack.py`. If a rule is wrong,
 discuss with the user and update the rule intentionally.
@@ -47,6 +53,23 @@ This checks:
 - Every slug in `current_location`, `present_entities`, inventory, and
   `relationships.by_slug` exists in the referenced pack (or starts with
   `emergent:`).
+- **Progression invariants** (v0.4):
+  - After turn 0, `player.innate_traits` must be exactly 3 entries
+    with 3 distinct universal archetype keys.
+  - After turn 0, `player.artifact` must be set.
+  - `player.destiny_traits` count ≤ `player.stage_index`; no
+    duplicate destiny archetypes.
+  - `player.stage_label` is populated when `stage_index > 0`.
+  - `player.health_state == "dead"` requires
+    `player.status == "dead"` and a `run_summary.md` file in the
+    save directory (the terminal death flow did not run if this is
+    missing).
+  - The compact turn HUD inside `current_scene.md` matches the
+    underlying state; drift means manual edits or a missing
+    `render_save.py` re-run.
+  - If `saves/<pack>/meta_progress.json` exists, its `pack_name`
+    matches this save, it parses, and its `best_stage_index` is
+    within bounds.
 
 Exit 0 = clean. Exit 1 = issues. Do not auto-fix save state without user
 confirmation. A high `divergences.jsonl` line count (>10 per 20 turns) is

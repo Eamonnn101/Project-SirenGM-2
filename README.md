@@ -17,14 +17,33 @@ immutable, the pack is an LLM-maintained persistent middle layer, and
 runtime reads from the compiled pack + structured save instead of
 re-deriving from raw text on every turn.
 
-**Version: v0.4** — headline feature is **pacing discipline** on the
-[conflict engine](#the-conflict-engine-v03v04): every frame now
-carries a `beat_budget` (3–6, default 4) that steers conflicts to
-resolve in 3–5 turns, `current_scene.md` flips its momentum field to
-`收束在即 / Endgame` as the frame enters its last beat, the beat-density
-rule doubles from one pivot per turn to two, and routine player actions
-(travel, rest, montage) may compress hours or days into a single turn
-outside conflicts. See [Changelog](#changelog) for the full list.
+**Version: v0.4** — two headline tranches shipped under this label:
+
+1. **Pacing discipline** on the
+   [conflict engine](#the-conflict-engine-v03v04): every frame
+   carries a `beat_budget` (3–6, default 4), `current_scene.md`
+   flips momentum to `收束在即 / Endgame` on the last beat,
+   beat density doubled to two pivots per turn, and routine
+   actions may compress hours/days outside active conflicts.
+2. **Progression layer** — a Tale-of-Immortal-shaped build loop
+   adapted to any novel: one artifact + three innate traits at
+   new-game, six narrative stages with GM-judged breakthroughs
+   against per-stage patterns in each pack's
+   `progression_rules.md`, one-of-three destiny pick per
+   breakthrough (12 universal seeds), a 5-state health ladder
+   (`healthy → dead`) with survival-trigger precedence
+   (`bond_rescue` artifact → `not_meant_to_die` →
+   `last_barrier`) before death is terminal, a terminal death
+   flow that writes `run_summary.md` and updates per-pack
+   `saves/<pack>/meta_progress.json` (seen-pool coverage, counters,
+   death history), an unseen-first draft bias on the artifact /
+   innate / destiny menus until ~70% pool coverage, and a
+   two-layer textual HUD (compact turn HUD in `current_scene.md` +
+   full build HUD in `player.md` / `inspect_save.py`) in zh/en.
+   No XP, no numeric levels, no HP bar — every layer stays
+   narrative.
+
+See [Changelog](#changelog) for the full list.
 
 ## Quickstart
 
@@ -228,6 +247,56 @@ call these at the appropriate points.
 ## Changelog
 
 ### v0.4
+
+- **Progression layer (new tranche).** One artifact + 3 distinct
+  innate traits at new-game (Steps 1.5 + 1.6); six narrative
+  stages (`stage_index` 0..5) stored on `PlayerState` with
+  novel-themed labels from each pack's `progression_rules.md`;
+  breakthroughs are GM-judged against per-stage trigger patterns
+  in the pack; one-of-three destiny pick per breakthrough drawn
+  from 12 universal seeds grouped into four families
+  (survival/insight/desperation/companion); destiny archetypes
+  distinct within a run; up to 5 destiny picks (stage_index 1..5).
+- **5-state health ladder.** `healthy → hurt → badly_hurt →
+  critical → dead` stored on `PlayerState.health_state`.
+  `critical` demands priority handling on the next turn but not
+  a strict 1-turn death clock; consequence timing tracks the
+  genre.
+- **Survival-trigger precedence.** Before a fatal patch becomes
+  terminal, the engine checks artifact `bond_rescue` →
+  `not_meant_to_die` → `last_barrier` in fixed order. Any firing
+  trigger transitions to `critical` and marks the
+  artifact/trait used/exhausted. Codified in
+  `tools/_progression.py :: resolve_survival_trigger`.
+- **Terminal death + clean completion.** On terminal death, the
+  turn emits the boxed Run-end block, writes `run_summary.md`,
+  and bumps `deaths_count` in `saves/<pack>/meta_progress.json`.
+  Clean completion (stage 5 reached without dying) bumps
+  `runs_finished` instead; no `DeathRecord`.
+- **Light meta progression.** `saves/<pack>/meta_progress.json`
+  tracks `runs_started / runs_finished / deaths_count /
+  best_stage_index`, archetype coverage
+  (`seen_*_archetypes`) for unseen-first draft bias until ~70%
+  pool coverage, novel-themed slug coverage
+  (`seen_*_slugs`) for flavor variation, and a
+  `DeathRecord` history. Light, not an unlock tree.
+- **Two-layer textual HUD.** `tools/_hud.py` renders a Unicode
+  boxed compact turn HUD at the top of `current_scene.md` every
+  turn (stage / health / artifact / innate / destiny / conflict /
+  goals / threads with warning markers) and a full build HUD in
+  `player.md` + `inspect_save.py` (activation contracts,
+  exhausted flags, pack-archive meta summary). zh and en parity.
+- **Extended lint.** `lint_save.py` checks the new invariants
+  (innate length & distinctness, destiny count ≤ stage_index,
+  artifact set after turn 0, `run_summary.md` on death, compact
+  HUD drift, `meta_progress.json` shape). `lint_pack.py`
+  requires all 7 sections in each user pack's
+  `progression_rules.md`.
+- **Tests.** `tests/test_player_progression.py` — 45 stdlib
+  `unittest` cases covering model validation, survival-trigger
+  precedence, draft bias, meta merge on death/completion, and
+  edge cases. Run:
+  `python -m unittest tests.test_conflict_budget tests.test_player_progression`.
 
 - **Conflict pacing budget.** `ConflictFrame.beat_budget` (int, 3–6,
   default 4) set once at `conflict_open`; remaining beats derived as

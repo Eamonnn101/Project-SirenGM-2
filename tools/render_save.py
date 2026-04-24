@@ -36,19 +36,31 @@ if __package__ is None or __package__ == "":
     from _models import (
         DivergenceNote,
         OpenLoops,
+        PackMetaProgress,
         RelationshipState,
         Save,
         SessionLogEntry,
         WorldState,
     )
+    from _hud import (
+        hud_labels,
+        render_compact_turn_hud,
+        render_full_build_hud,
+    )
 else:
     from ._models import (
         DivergenceNote,
         OpenLoops,
+        PackMetaProgress,
         RelationshipState,
         Save,
         SessionLogEntry,
         WorldState,
+    )
+    from ._hud import (
+        hud_labels,
+        render_compact_turn_hud,
+        render_full_build_hud,
     )
 
 
@@ -202,11 +214,32 @@ def load_save(save_dir: Path) -> Save:
 # Rendering
 # ---------------------------------------------------------------------------
 
+def load_meta_progress(save_dir: Path) -> PackMetaProgress | None:
+    """Load `saves/<pack>/meta_progress.json` if present.
+
+    `save_dir` is the per-save directory; the meta lives in its parent
+    (`saves/<pack>/`). Returns None when the file is missing.
+    """
+    meta_path = save_dir.parent / "meta_progress.json"
+    if not meta_path.is_file():
+        return None
+    try:
+        return PackMetaProgress(**json.loads(meta_path.read_text(encoding="utf-8")))
+    except Exception:
+        return None
+
+
 def render_all(save_dir: Path, save: Save, *, language: str | None) -> None:
     L = _labels_for(language)
+    HL = hud_labels(language)
+    meta = load_meta_progress(save_dir)
     save_dir.mkdir(parents=True, exist_ok=True)
-    (save_dir / "current_scene.md").write_text(render_current_scene(save, L), encoding="utf-8")
-    (save_dir / "player.md").write_text(render_player_md(save, L), encoding="utf-8")
+    (save_dir / "current_scene.md").write_text(
+        render_current_scene(save, L, HL), encoding="utf-8"
+    )
+    (save_dir / "player.md").write_text(
+        render_player_md(save, L, HL, meta), encoding="utf-8"
+    )
     session_md, session_jsonl = render_session_log(save, L)
     (save_dir / "session_log.md").write_text(session_md, encoding="utf-8")
     (save_dir / "session_log.jsonl").write_text(session_jsonl, encoding="utf-8")
@@ -218,8 +251,9 @@ def render_all(save_dir: Path, save: Save, *, language: str | None) -> None:
     )
 
 
-def render_current_scene(save: Save, L: dict[str, str]) -> str:
+def render_current_scene(save: Save, L: dict[str, str], HL: dict[str, str]) -> str:
     w = save.world
+    compact_hud = render_compact_turn_hud(save, HL)
     lines: list[str] = [
         "---",
         f"turn: {w.turn}",
@@ -228,6 +262,10 @@ def render_current_scene(save: Save, L: dict[str, str]) -> str:
         f"location: {w.current_location}",
         f"risk_level: {w.risk_level}",
         "---",
+        "",
+        "```",
+        compact_hud,
+        "```",
         "",
         f"# {L['current_scene']}",
         "",
@@ -292,36 +330,32 @@ def _render_last_conflict_block(summary, L: dict[str, str]) -> list[str]:
     return lines
 
 
-def render_player_md(save: Save, L: dict[str, str]) -> str:
+def render_player_md(
+    save: Save,
+    L: dict[str, str],
+    HL: dict[str, str],
+    meta: PackMetaProgress | None,
+) -> str:
+    """Render `player.md` as the full build HUD (Layer B)."""
     p = save.world.player
     fm_lines = [
         "---",
         f"slug: {p.slug}",
         f"name: {p.name}",
         f"status: {p.status}",
+        f"stage_index: {p.stage_index}",
+        f"health_state: {p.health_state}",
     ]
+    if p.stage_label:
+        fm_lines.append(f"stage_label: {p.stage_label}")
     if p.progression:
         fm_lines.append(f"progression: {p.progression}")
     if p.affiliation:
         fm_lines.append(f"affiliation: {p.affiliation}")
-    fm_lines += ["---", "", f"# {p.name}", ""]
+    fm_lines += ["---", ""]
 
-    body: list[str] = []
-    if p.progression:
-        body.append(f"- {L['player_progression']}：**{p.progression}**")
-    body.append(f"- {L['player_status']}：{p.status}")
-    if p.affiliation:
-        body.append(f"- {L['player_affiliation']}：{p.affiliation}")
-    if p.titles:
-        body.append(f"- {L['player_titles']}：{', '.join(p.titles)}")
-    for key, value in p.stats.items():
-        body.append(f"- {key}：{value}")
-    if p.inventory:
-        body.append(f"- {L['player_inventory']}：")
-        for item in p.inventory:
-            note = f" — {item.notes}" if item.notes else ""
-            body.append(f"  - {item.name} (`{item.slug}`){note}")
-    return "\n".join(fm_lines + body) + "\n"
+    body = render_full_build_hud(save, HL, meta=meta)
+    return "\n".join(fm_lines) + "\n```\n" + body + "\n```\n"
 
 
 def render_session_log(save: Save, L: dict[str, str]) -> tuple[str, str]:

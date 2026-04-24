@@ -43,6 +43,49 @@ Read `packs/<pack>/characters/*.md`. Prefer the character with
 `role: protagonist` in its frontmatter. If multiple, ask the user
 to pick.
 
+## Step 1.5 · Pick artifact
+
+Read `packs/<pack>/progression_rules.md` §3 (artifact archetypes)
+and, if it exists, `saves/<pack>/meta_progress.json`.
+
+Emit the **Artifact pick block** per
+`genre_packs/universal/prompts/new_game_build_picks.md`. Three
+options are shown, one per universal archetype (`insight`,
+`bond_rescue`, `companion`); ordering follows
+`artifact_draw_order(meta)` from `tools/_progression.py` so the
+most-unseen archetype in this pack's history surfaces first.
+
+On the player's reply (A / B / C / D-as-free-form), emit the
+`player_artifact_set` patch with the chosen archetype + the
+novel-themed slug, name, and `notes` (activation rule) from
+`progression_rules.md`. Free-form (D) replies are classified to
+the nearest universal archetype; tell the player briefly how you
+classified.
+
+## Step 1.6 · Pick 3 innate traits
+
+Read `packs/<pack>/progression_rules.md` §4 (innate archetypes).
+
+Emit the **Innate pick block** per
+`prompts/new_game_build_picks.md`. All 5 archetype options are
+shown, ordered per `innate_draw_order(meta)`. The player picks
+**3 distinct archetypes**.
+
+On valid picks (3 distinct archetype keys), emit
+`player_innate_traits_set` with exactly 3 `Trait` dicts — `kind:
+"innate"`, `archetype: <universal key>`, `slug`/`name`/`notes`
+from `progression_rules.md`. Reject and restate the block if the
+player picks fewer than 3 or duplicates an archetype.
+
+After both picks:
+
+- `world_state.player.artifact` is populated.
+- `world_state.player.innate_traits` has exactly 3 entries.
+- Set `world_state.player.stage_index = 0` and
+  `world_state.player.stage_label = <stage 0 label from
+  progression_rules.md §1>`.
+- Set `world_state.player.health_state = "healthy"`.
+
 ## Step 2 · Propose an opening scene
 
 Based on the protagonist's `location` (if set), the pack's
@@ -68,13 +111,28 @@ Create `saves/<pack>/<save_id>/` and write:
 - `world_state.json` — the schema is defined in `tools/_models.py::WorldState`.
   Fields: `turn: 0`, `day: 0`, `time_of_day: "morning"`, `current_location`,
   `present_entities`, `active_threads`, `current_objectives`, `risk_level`,
-  `player` (mirrors chosen protagonist entity), `flags: {}`.
+  `player` (mirrors chosen protagonist entity + the artifact + innate traits
+  picked in Steps 1.5/1.6 + `stage_index: 0`, `stage_label` from
+  `progression_rules.md`, `health_state: "healthy"`, empty `destiny_traits`),
+  `flags: {}`.
 - `relationship_state.json` — `{"by_slug": {}}` (empty; populated as
   the player meets NPCs).
 - `open_loops.json` — `{"items": []}`.
 - `player.json` — duplicate of `world_state.json::player`.
 - `session_log.jsonl` — empty file (`touch` it).
 - `divergences.jsonl` — empty file.
+
+**Also** update (or create) `saves/<pack>/meta_progress.json`:
+
+- If the file does not exist: initialize
+  `PackMetaProgress(pack_name="<pack>", runs_started=1)` and write.
+- If it exists: load it, increment `runs_started`, preserve all
+  other fields (seen lists, counters, deaths history), and write
+  back. `tools/_models.py::PackMetaProgress` defines the shape.
+
+`meta.json::save_id` stores only the short id (`save_001`), not
+the pack-qualified form — the pack is encoded in the directory
+path and mirrored in `meta.json::pack_name`.
 
 `meta.json::save_id` stores only the short id (`save_001`), not the
 pack-qualified form — the pack is encoded in the directory path and

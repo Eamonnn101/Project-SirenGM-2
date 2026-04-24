@@ -200,8 +200,21 @@ _REQUIRED_USER_PACK_FILES = (
     "overview.md",
     "canon_guardrails.md",
     "timeline.md",
+    "progression_rules.md",
     "relationships/relationship_matrix.md",
     "contradictions/ambiguous_points.md",
+)
+
+# Sections required in progression_rules.md. Matched by an H2 line
+# `## <title>`; subsection order is flexible, but all 7 must appear.
+_REQUIRED_PROGRESSION_SECTIONS = (
+    ("stages", ("Stages", "境界", "阶段")),
+    ("breakthrough_triggers", ("Breakthrough triggers", "Breakthrough Triggers", "破境触机", "破境触发")),
+    ("artifacts", ("Artifacts", "Artifact archetypes", "法宝", "法宝类型")),
+    ("innate", ("Innate", "Innate traits", "天赋", "天赋类型")),
+    ("destiny", ("Destiny", "Destiny traits", "命格", "命格类型")),
+    ("health_ladder", ("Health ladder", "Health", "体况", "体况梯度")),
+    ("breakthrough_voice", ("Breakthrough voice", "破境笔触", "破境风格")),
 )
 
 
@@ -247,6 +260,9 @@ def _lint_user(pack, pack_dir: Path, *, genre_packs_root: Path | None) -> list[s
             if ent not in character_slugs and ent not in faction_slugs:
                 issues.append(f"arc {arc.slug!r} lists unknown driving_entity {ent!r}")
 
+    # progression_rules.md section checks (7 required sections).
+    issues.extend(_lint_progression_rules(pack_dir))
+
     # [[wiki-links]] resolution: every link in any body should match an entity slug.
     # We also build a slug → display-name map so we can require a |Display label
     # on references to entities whose canonical name contains non-ASCII characters
@@ -256,6 +272,43 @@ def _lint_user(pack, pack_dir: Path, *, genre_packs_root: Path | None) -> list[s
         for page in bucket:
             slug_to_name[page.slug] = page.name
     issues.extend(_scan_wiki_links(pack_dir, slug_to_name))
+    return issues
+
+
+def _lint_progression_rules(pack_dir: Path) -> list[str]:
+    """Confirm packs/<pack>/progression_rules.md carries all 7 required
+    sections (matching H2 headings or their known zh/en synonyms).
+
+    The file itself is required by _REQUIRED_USER_PACK_FILES. This check
+    adds structural validation — a progression_rules.md that parses but
+    is missing sections will not serve the turn loop or new-game flow.
+
+    Heading matching is case-insensitive: ingested packs may legitimately
+    use natural title case (`## Artifact Archetypes`) and we should not
+    reject a compliant file based only on capitalization.
+    """
+    path = pack_dir / "progression_rules.md"
+    if not path.is_file():
+        # The required-files check will have flagged the missing file.
+        return []
+    text = path.read_text(encoding="utf-8")
+    # Extract all H2 lines (`## ...`), normalized for case-insensitive
+    # substring matching. Lowercasing is a no-op on CJK characters, so
+    # zh synonyms like "境界" / "破境触机" still match exactly.
+    headings_lower: list[str] = []
+    for raw in text.splitlines():
+        line = raw.strip()
+        if line.startswith("## "):
+            headings_lower.append(line[3:].strip().lower())
+
+    issues: list[str] = []
+    for section_key, synonyms in _REQUIRED_PROGRESSION_SECTIONS:
+        syns_lower = [syn.lower() for syn in synonyms]
+        if not any(any(syn in h for syn in syns_lower) for h in headings_lower):
+            issues.append(
+                f"progression_rules.md missing required section {section_key!r} "
+                f"(expected an H2 heading containing one of: {list(synonyms)})"
+            )
     return issues
 
 

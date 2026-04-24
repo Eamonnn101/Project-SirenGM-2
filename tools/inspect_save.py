@@ -20,12 +20,15 @@ from pathlib import Path
 
 if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from render_save import load_save
+    from _hud import hud_labels, render_full_build_hud
+    from render_save import _read_pack_language, load_meta_progress, load_save
 else:
-    from .render_save import load_save
+    from ._hud import hud_labels, render_full_build_hud
+    from .render_save import _read_pack_language, load_meta_progress, load_save
 
 
-def format_summary(save) -> str:
+def format_summary(save, *, save_dir: Path | None = None, language: str | None = None) -> str:
+    """Compact terminal summary + full progression build HUD."""
     w = save.world
     p = w.player
     progression = f"  {p.progression}" if p.progression else ""
@@ -36,6 +39,8 @@ def format_summary(save) -> str:
         f"turn:     {w.turn}   day: {w.day}   time: {w.time_of_day}   risk: {w.risk_level}",
         f"location: {w.current_location}",
         f"player:   {p.name} ({p.slug}){progression}  {p.status}{affiliation}",
+        f"health:   {p.health_state}   stage: {p.stage_index}"
+        + (f"  ({p.stage_label})" if p.stage_label else ""),
     ]
     if w.present_entities:
         lines.append("present:  " + ", ".join(w.present_entities))
@@ -58,6 +63,13 @@ def format_summary(save) -> str:
         lines.append(f"last turn {last.turn}: {preview[:80]}")
     if save.divergences:
         lines.append(f"divergences: {len(save.divergences)}")
+
+    # Full progression build HUD (mirrors player.md layer B).
+    meta = load_meta_progress(save_dir) if save_dir is not None else None
+    HL = hud_labels(language)
+    build = render_full_build_hud(save, HL, meta=meta)
+    lines.append("")
+    lines.append(build)
     return "\n".join(lines) + "\n"
 
 
@@ -65,13 +77,15 @@ def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--save", required=True, help="path under saves/, typically <pack>/<save_id>")
     p.add_argument("--saves-root", type=Path, default=Path("saves"))
+    p.add_argument("--packs-root", type=Path, default=Path("packs"))
     args = p.parse_args(argv)
     save_dir = args.saves_root / args.save
     if not save_dir.is_dir():
         print(f"error: save dir not found: {save_dir}", file=sys.stderr)
         return 2
     save = load_save(save_dir)
-    sys.stdout.write(format_summary(save))
+    language = _read_pack_language(args.packs_root, save.pack_name)
+    sys.stdout.write(format_summary(save, save_dir=save_dir, language=language))
     return 0
 
 

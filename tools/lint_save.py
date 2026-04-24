@@ -34,13 +34,31 @@ from pathlib import Path
 
 if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parent))
-    from _models import DivergenceNote, OpenLoops, RelationshipState, SessionLogEntry, WorldState
+    from _models import (
+        DivergenceNote,
+        OpenLoops,
+        PackMetaProgress,
+        RelationshipState,
+        SessionLogEntry,
+        STAGE_INDEX_MAX,
+        WorldState,
+    )
+    from _hud import hud_labels, render_compact_turn_hud
     from lint_pack import load_pack
-    from render_save import _labels_for, _read_pack_language, load_save
+    from render_save import _labels_for, _read_pack_language, load_meta_progress, load_save
 else:
-    from ._models import DivergenceNote, OpenLoops, RelationshipState, SessionLogEntry, WorldState
+    from ._models import (
+        DivergenceNote,
+        OpenLoops,
+        PackMetaProgress,
+        RelationshipState,
+        SessionLogEntry,
+        STAGE_INDEX_MAX,
+        WorldState,
+    )
+    from ._hud import hud_labels, render_compact_turn_hud
     from .lint_pack import load_pack
-    from .render_save import _labels_for, _read_pack_language, load_save
+    from .render_save import _labels_for, _read_pack_language, load_meta_progress, load_save
 
 
 def lint_save(save_dir: Path, *, packs_root: Path | None = None) -> list[str]:
@@ -93,6 +111,21 @@ def lint_save(save_dir: Path, *, packs_root: Path | None = None) -> list[str]:
 
     # 7. Conflict frame freshness.
     issues.extend(_lint_conflict_frame(save))
+
+    # 8. Progression-layer invariants (stage / health / traits / artifact).
+    issues.extend(_lint_progression(save, save_dir))
+
+    # 9. Compact turn HUD drift inside current_scene.md.
+    issues.extend(
+        _lint_compact_hud_drift(
+            save_dir,
+            save,
+            _read_pack_language(packs_root, save.pack_name) if packs_root else None,
+        )
+    )
+
+    # 10. meta_progress.json (optional sibling file).
+    issues.extend(_lint_meta_progress(save_dir, save))
 
     return issues
 
@@ -207,6 +240,100 @@ def _lint_slugs(save, pack) -> list[str]:
                     continue
                 _check(member, f"current_conflict.sides[{side.label!r}].members", known)
     return issues
+
+
+def _lint_progression(save, save_dir: Path) -> list[str]:
+    """Progression-layer invariants (stage, health, traits, artifact, terminal)."""
+    issues: list[str] = []
+    p = save.world.player
+
+    # Innate length: must be exactly 3 on every persisted save.
+    # `playbooks/new-game.md` writes the save only AFTER Step 1.6 sets
+    # innates; if the bootstrap was skipped the save is broken from
+    # turn 0, so there is no `turn > 0` exemption.
+    if len(p.innate_traits) != 3:
+        issues.append(
+            f"player.innate_traits must be exactly 3; got {len(p.innate_traits)} "
+            f"(did new-game Step 1.6 run before persisting?)"
+        )
+
+    # Destiny count must not exceed the current stage_index (at most one per
+    # breakthrough, stages 1..STAGE_INDEX_MAX). Model validates source_stage
+    # per-entry; lint enforces the simpler count invariant.
+    if len(p.destiny_traits) > p.stage_index:
+        issues.append(
+            f"player.destiny_traits has {len(p.destiny_traits)} entries but "
+            f"stage_index={p.stage_index} allows at most {p.stage_index}"
+        )
+
+    # Artifact: must be set on every persisted save. new-game Step 1.5
+    # populates it before Step 3 writes any JSON, so a null artifact on
+    # disk means the bootstrap was skipped.
+    if p.artifact is None:
+        issues.append(
+            "player.artifact is null (did new-game Step 1.5 run before persisting?)"
+        )
+
+    # Stage_label should be set whenever the player has advanced past stage 0.
+    if p.stage_index > 0 and not p.stage_label:
+        issues.append(
+            f"player.stage_label is empty but stage_index={p.stage_index}; "
+            f"set the novel-themed label from progression_rules.md"
+        )
+
+    # Terminal save invariants: on death, expect run_summary.md.
+    if p.health_state == "dead":
+        run_summary = save_dir / "run_summary.md"
+        if not run_summary.is_file():
+            issues.append(
+                "player.health_state='dead' but run_summary.md is missing; "
+                "death flow (playbooks/death-and-restart.md) did not run"
+            )
+
+    return issues
+
+
+def _lint_compact_hud_drift(save_dir: Path, save, language: str | None) -> list[str]:
+    """Confirm the compact turn HUD inside current_scene.md matches current state."""
+    scene_path = save_dir / "current_scene.md"
+    if not scene_path.is_file():
+        # Already reported by _lint_current_scene_drift.
+        return []
+    text = scene_path.read_text(encoding="utf-8")
+    HL = hud_labels(language)
+    expected = render_compact_turn_hud(save, HL)
+    if expected not in text:
+        return [
+            "current_scene.md compact-HUD block is stale or missing "
+            "(re-run render_save.py)"
+        ]
+    return []
+
+
+def _lint_meta_progress(save_dir: Path, save) -> list[str]:
+    """Validate saves/<pack>/meta_progress.json if it exists."""
+    meta_path = save_dir.parent / "meta_progress.json"
+    if not meta_path.is_file():
+        return []
+    try:
+        raw = json.loads(meta_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        return [f"meta_progress.json failed to parse: {type(e).__name__}: {e}"]
+    try:
+        meta = PackMetaProgress(**raw)
+    except Exception as e:
+        return [f"meta_progress.json failed validation: {type(e).__name__}: {e}"]
+    if meta.pack_name != save.pack_name:
+        return [
+            f"meta_progress.json pack_name={meta.pack_name!r} but this save's "
+            f"pack_name={save.pack_name!r}"
+        ]
+    if meta.best_stage_index > STAGE_INDEX_MAX:
+        return [
+            f"meta_progress.json best_stage_index={meta.best_stage_index} "
+            f"exceeds STAGE_INDEX_MAX={STAGE_INDEX_MAX}"
+        ]
+    return []
 
 
 def _lint_conflict_frame(save) -> list[str]:

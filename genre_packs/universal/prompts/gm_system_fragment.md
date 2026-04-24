@@ -354,3 +354,109 @@ The pack's schemas mark which plot pieces are genuinely binding:
   (never write `hidden_truths.md` directly).
 - Do not recap or summarize after narrating. Hand the turn to the
   state updater and stop.
+
+## Progression layer (v0.4)
+
+The v0.4 progression layer adds stages, artifacts, innate/destiny
+traits, a health ladder, death, and light meta. Mechanical seeds
+live in `genre_packs/universal/systems/` (`stages.md`,
+`artifacts.md`, `innate_traits.md`, `destiny_traits.md`,
+`health_and_death.md`, `meta_progression.md`). Novel-themed
+instances live in each user pack's `progression_rules.md`. The GM
+reads both on every turn.
+
+### Compact turn HUD (load-bearing display)
+
+`render_save.py` writes a compact turn HUD at the top of
+`current_scene.md` on every turn. The HUD shows stage, health,
+artifact, innate traits, destiny traits, conflict momentum, goals,
+and threads — with warning markers for `badly_hurt`/`critical`/
+`dead` and for `tense`/`dangerous`/`lethal` risk. Never narrate
+the HUD's contents verbatim inside the prose; the prose shows the
+beat, the HUD names the state.
+
+### Stage advance guidance (soft)
+
+When the scene's climactic beat matches one of the per-stage
+patterns in `progression_rules.md` §2, emit `player_stage_advance:
+{new_index, new_label}` in the same turn's patch. Rules:
+
+- Max 5 advances per run. Never more than one per turn.
+- Never on a non-climactic turn (no breakthroughs during small
+  talk, shopping, travel).
+- No regression — stages only move forward.
+
+On the breakthrough turn, replace the usual A/B/C/D options with
+the Breakthrough block from `prompts/breakthrough_pick.md`. The
+next turn's patch applies `player_destiny_trait_add` (or no-op on
+the D fallback).
+
+### Health ladder discipline
+
+The 5 states are `healthy`, `hurt`, `badly_hurt`, `critical`,
+`dead`. Move states via `player_health_state: <state>` in the
+turn's patch whenever the narration implies a transition.
+
+- Adjacent moves are the common case. Skips are allowed only when
+  the prose clearly stages them.
+- `critical` requires **mandatory priority handling on the next
+  turn**: the prose centers on the danger, and A/B/C/D center on
+  the crisis. It is **not** a hard "recover or die" 1-turn clock.
+  Consequence timing follows the genre (a poison may linger 2–3
+  beats; a bleed-out may play across a contested scene) as long as
+  the danger stays visible in every intervening turn.
+- `dead` is terminal only after **survival-trigger precedence**
+  (next section) fails to fire.
+
+### Survival-trigger precedence (load-bearing)
+
+Before committing a `player_health_state: "dead"` patch as
+terminal, check triggers in this fixed order. Any one firing
+replaces the patch with the trigger's outcome (`health_state →
+critical`), the relevant artifact/trait is marked
+`used`/`exhausted: true`, and the prose shows the trigger firing.
+The turn is **not** terminal.
+
+1. **Artifact `bond_rescue`** — if `player.artifact.archetype ==
+   "bond_rescue"` and `player.artifact.used == False`.
+2. **Destiny `not_meant_to_die`** — if present and not exhausted.
+3. **Destiny `last_barrier`** — only on `critical → dead`; grants
+   one extra buffer turn at `critical`, trait exhausts.
+
+No other MVP trigger prevents death. The implementation lives in
+`tools/_progression.py :: resolve_survival_trigger`; the GM must
+narrate in the same order.
+
+### Breakthrough turn output
+
+See `prompts/breakthrough_pick.md` for the exact block shape.
+Short narration (1–3 paragraphs) describing the breakthrough,
+followed by the boxed destiny-pick block with three options + the
+fixed D fallback. **No A/B/C/D options block on this turn.**
+
+### Death / completion turn output
+
+See `prompts/death_coda.md`. Short coda narration (150–350 zh
+chars / 100–200 en words), followed by the boxed Run-end block
+(verbatim, zh/en variant). **No A/B/C/D options block.** The turn
+also writes `run_summary.md` and updates
+`saves/<pack>/meta_progress.json` via
+`tools/_progression.py :: merge_run_into_meta`.
+
+### Patch keys added by the progression layer
+
+All optional. Apply per `playbooks/play-turn.md` Step 2.
+
+- `player_artifact_set` — accepted only at `turn == 0` or when
+  `artifact is None`.
+- `player_innate_traits_set` — accepted only at `turn == 0`.
+  Exactly 3 distinct-archetype Trait dicts.
+- `player_stage_advance` — `{new_index, new_label}`. Must advance
+  by exactly 1, up to 5.
+- `player_destiny_trait_add` — single Trait dict with
+  `source_stage == current stage_index`. Rejected if the slot for
+  the current stage is already filled.
+- `player_trait_exhaust` — `{slug}`. Idempotent. Used by the
+  survival-trigger flow and by once-per-run destiny effects.
+- `player_health_state` — `HealthState`. Setting `"dead"` routes
+  through survival-trigger precedence before becoming terminal.

@@ -151,7 +151,40 @@ Then, in this order, write:
 
    Keep it tight — the GM reads it on every turn.
 
-3. `packs/<slug>/canon_guardrails.md` — may be a stub at this stage
+3. `packs/<slug>/progression_rules.md` — the novel-themed
+   re-skinning of the universal progression-layer seeds. The GM
+   reads this at new-game (artifact + innate pick) and at every
+   breakthrough (destiny pick). **Seven required sections**, in
+   the pack's declared language:
+   1. Stages (6) — novel-themed label + 1-paragraph description
+      per `stage_index` 0..5.
+   2. Breakthrough triggers per stage — 2–4 novel-themed trigger
+      patterns per stage, grounding when the GM should cue a
+      breakthrough.
+   3. Artifact archetypes (3) — one instance per universal key
+      (`insight`, `bond_rescue`, `companion`): slug, display name,
+      1-paragraph lore fit, one-line activation rule.
+   4. Innate trait archetypes (5) — one instance per universal
+      key (`talent`, `survival`, `social`, `resource`,
+      `temperament`): slug, display name, 1–2 sentence flavor.
+   5. Destiny trait seeds (12) — one instance per universal seed
+      (full list in `genre_packs/universal/systems/destiny_traits.md`);
+      each entry carries the universal archetype key in
+      frontmatter so lint can validate.
+   6. Health ladder wording — the 5 states named in novel voice
+      (1:1 map to the universal enum `healthy → dead`).
+   7. Breakthrough voice — a one-paragraph style guide for how
+      breakthroughs (and the run-end coda) feel in this novel.
+
+   Full contract is in
+   `genre_packs/universal/prompts/ingest_draft_system.md` (§ "After
+   novel_rules.md — synthesize progression_rules.md") and in
+   `genre_packs/universal/systems/*.md`.
+
+   `tools/lint_pack.py` rejects user packs whose
+   `progression_rules.md` is missing any of the 7 sections.
+
+4. `packs/<slug>/canon_guardrails.md` — may be a stub at this stage
    (a heading plus "no novel-specific overrides yet"); Stage 4 may
    refine it.
 
@@ -205,8 +238,9 @@ the per-kind schemas under `genre_packs/universal/schemas/*.schema.md`.
 Re-read `packs/<slug>/novel_rules.md` — every drafted page must be
 consistent with it.
 
-If Stage 0's `novel_rules.md` turned out to be incomplete or wrong
-based on later chunks, revise it here and note the change in
+If Stage 0's `novel_rules.md` or `progression_rules.md` turned out
+to be incomplete or wrong based on later chunks, revise them here
+and note the change in
 `packs/<slug>/contradictions/ambiguous_points.md`.
 
 Group `mentions.jsonl` by `(kind, slug)`. For each group, draft a

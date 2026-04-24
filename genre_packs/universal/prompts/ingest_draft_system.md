@@ -42,6 +42,55 @@ Required sections in `novel_rules.md`:
 guardrails, so keep it to the load-bearing rules only — the things
 the GM needs to stay in character for *this* novel.
 
+## After novel_rules.md — synthesize progression_rules.md
+
+Before drafting any entity pages, synthesize
+`packs/<pack>/progression_rules.md` as well. This file re-themes
+the **universal progression-layer seeds** (shipped in
+`genre_packs/universal/systems/`) into novel-flavored instances.
+The GM reads `progression_rules.md` at new-game (artifact + innate
+pick) and at every breakthrough (destiny pick), so each section
+must be complete before play begins.
+
+Write it in the pack's declared `language`. Seven required
+sections, in any order:
+
+1. **Stages (6)** — for each `stage_index` 0..5:
+   - novel-themed label (one line)
+   - 1-paragraph description of what the stage feels like, what
+     kinds of situations it contains, what the PC typically
+     has/lacks
+2. **Breakthrough triggers per stage (6 × 2–4 patterns)** — for
+   each stage, list 2–4 novel-themed trigger patterns that would
+   qualify as the climactic beat cueing a breakthrough. The GM
+   still judges when to advance, but these give the engine
+   grounded patterns rather than free judgment.
+3. **Artifact archetypes (3)** — one novel-flavored instance per
+   universal key (`insight`, `bond_rescue`, `companion`) with:
+   - ASCII snake_case slug, novel-themed display name
+   - 1-paragraph lore fit
+   - one-line activation rule (when does it fire; is it
+     repeatable?)
+4. **Innate trait archetypes (5)** — one instance per universal
+   key (`talent`, `survival`, `social`, `resource`,
+   `temperament`) with slug, display name, and 1–2 sentence
+   flavor.
+5. **Destiny trait seeds (12)** — one instance per universal
+   seed. Keep the universal archetype key in the entry's
+   frontmatter so lint can validate. Each entry: slug, display
+   name, 1–2 sentence effect in novel terms.
+6. **Health ladder wording** — the five states (`healthy`,
+   `hurt`, `badly_hurt`, `critical`, `dead`) named in novel
+   voice. 1:1 mapping to the universal enum.
+7. **Breakthrough voice** — a one-paragraph style guide for how
+   breakthroughs feel in this novel (spiritual? political?
+   combat? romantic? sci-fi?), informing the prose of both the
+   breakthrough narration and the run-end coda.
+
+`progression_rules.md` is load-bearing — `playbooks/play-turn.md`
+reads it every turn, and `tools/lint_pack.py` rejects user packs
+that are missing any of the 7 sections.
+
 ## Per-entity drafting
 
 Inputs:
