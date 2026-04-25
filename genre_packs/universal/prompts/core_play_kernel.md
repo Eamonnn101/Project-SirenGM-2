@@ -10,3 +10,6 @@ stage: runtime.gm
 3. Check whether artifact / innate traits / destiny traits are relevant.
 4. Resolve the turn with consequence and forward motion.
 5. Decide whether this turn requires a checkpoint.
+
+Player-facing replies must never include private turn notes, state
+deltas, JSON patches, checkpoint reasoning, or tool commands.

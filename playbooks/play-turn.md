@@ -2,13 +2,13 @@
 
 One turn of gameplay against an active save. The agent is still the
 runtime; there is no separate game daemon. This playbook optimizes the
-runtime loop for weaker models by separating **ordinary turns** from
-**checkpoint turns**.
+runtime loop for weaker models by keeping ordinary turns light and using
+checkpoints only when state needs a durable write.
 
 The active save lives at `saves/<pack>/<save_id>/`. Canonical JSON is
 the source of truth at checkpoints. Between checkpoints, the agent uses
-conversation context, the compact active-state summary, and the pending
-buffer below.
+conversation context, the compact active-state summary, and private
+turn notes.
 
 ## Core Play Kernel
 
@@ -35,41 +35,37 @@ Use three layers during play:
 - **Active State Summary** — compact in-conversation snapshot seeded
   by `python tools/inspect_save.py --save <pack>/<save_id>
   --active-summary` when play starts/resumes or after each checkpoint.
-- **Pending State Since Last Checkpoint** — compact in-conversation
-  delta block maintained on ordinary turns. It is not shown to the
-  player and is not written to disk until checkpoint.
+- **Private turn notes since last checkpoint** — compact internal notes
+  maintained on ordinary turns. They are never shown to the player and
+  are not written to disk until checkpoint.
 
-Pending buffer template:
+The notes must stay short. They record only facts needed to safely
+persist the next checkpoint: turn notes, health changes, relationship
+changes, artifact/trait triggers, conflict changes, location changes,
+open consequences, and any immediate trigger. Keep the per-turn
+narration/options and one-line session-log summaries in conversation as
+internal context so the checkpoint can append one `SessionLogEntry` per
+noted turn.
 
-```text
-Pending State Since Last Checkpoint:
-- turn_delta:
-- health_delta:
-- relationship_delta:
-- artifact/trait triggers:
-- conflict_delta:
-- location_delta:
-- open consequences:
-- checkpoint_due:
-- immediate_trigger:
-```
-
-The buffer must stay short. It records only facts needed to safely
-persist the next checkpoint. Keep the per-turn narration/options and
-one-line session-log summaries in conversation as well so the checkpoint
-can append one `SessionLogEntry` per buffered turn.
+**Never include private turn notes, checkpoint decisions, JSON patches,
+tool plans, or debugging state in the player-facing reply.** If an
+internal state-delta block would appear in the chat reply, stop and
+remove that block before sending. The player-facing reply has only the
+HUD, optional conflict HUD, narration, and options or the required
+breakthrough/death block.
 
 ## Checkpoint Policy
 
-Default checkpoint interval: every 3 turns.
+There is no fixed every-N-turn checkpoint. Ordinary turns may proceed
+without file writes while state changes are minor and easy to carry in
+private notes. The agent decides whether to checkpoint based on the
+weight of the current changes, risk of forgetting, and continuity needs.
 
-Maximum checkpoint interval: 5 turns.
-
-Ordinary turns may proceed without file writes when no immediate trigger
-fires and the checkpoint interval has not been reached. A checkpoint
-turn applies the pending buffer to canonical JSON, appends session-log
-entries, re-renders markdown, and lints the save before the user-facing
-reply is considered safe.
+Checkpoint when a durable write would make the next turn safer or
+simpler. Always checkpoint for the immediate triggers below. A
+checkpoint turn applies private turn notes to canonical JSON, appends
+session-log entries, re-renders markdown, and lints the save before the
+user-facing reply is considered safe.
 
 The user can force a checkpoint/save at any time. Treat explicit
 "save", "checkpoint", "存档", and equivalent requests as tooling input,
@@ -78,7 +74,7 @@ not in-world action, unless they also include an in-world move.
 ### Immediate Checkpoint Triggers
 
 Do not leave these events only in chat memory. Flush them before
-replying, even if the ordinary checkpoint interval has not elapsed:
+replying:
 
 - player death
 - health becomes `critical` or `dead`
@@ -130,7 +126,7 @@ summary is the default context for ordinary turns.
 Do not re-scan the full pack or save by default. Use:
 
 - the active-state summary;
-- the pending buffer;
+- private turn notes;
 - recent conversation;
 - any narrow rule/page that the current turn actually triggers.
 
@@ -152,38 +148,40 @@ Rendered markdown is display-only.
 ### Mode A · Ordinary Turn
 
 Use this path when no immediate checkpoint trigger fires and the
-checkpoint interval has not been reached.
+agent judges the turn safe to carry in private notes.
 
 1. Run the Core Play Kernel.
 2. Produce the player-facing reply in the pack's language:
-   - compact HUD line derived from active summary + pending buffer;
+   - compact HUD line derived from active summary + private notes;
    - conflict HUD line if an active conflict remains live;
    - narration;
    - exactly three A/B/C options plus the fixed free-form D slot, unless
      a breakthrough/death block replaces options.
-3. Update the pending buffer in conversation.
+3. Update private turn notes in conversation only.
 4. Record the turn's player input, narration, options, and summary in
    conversation for the next checkpoint.
-5. Decide whether the next turn is scheduled checkpoint due.
+5. Decide whether this turn needs a checkpoint because the accumulated
+   notes have become too important, complex, or fragile to keep only in
+   memory.
 
 The compact HUD on an ordinary turn is provisional because it has not
 been rendered from JSON yet. Keep it consistent with the active summary
-and pending buffer, and do not invent new HUD vocabulary.
+and private notes, and do not invent new HUD vocabulary.
 
-### Mode B · Scheduled Checkpoint Turn
+### Mode B · Checkpoint Turn
 
-Use this path when `turn_delta` reaches 3 by default, or before it would
-exceed 5.
+Use this path when the user asks to save, an immediate trigger fires, or
+the agent judges that accumulated private notes should become durable.
 
 1. Resolve the current player input with the Core Play Kernel.
-2. Apply buffered turns in chronological order. Do not collapse the
-   buffer into a final-state patch. Instead, apply one buffered turn at a time:
+2. Apply noted turns in chronological order. Do not collapse the
+   notes into a final-state patch. Instead, apply one noted turn at a time:
    take that turn's patch, validate it against the current
    in-memory state, update the state, append that turn's
-   `SessionLogEntry`, then move to the next buffered turn. This preserves
+   `SessionLogEntry`, then move to the next noted turn. This preserves
    conflict costs, survival-trigger `prior_health_state`, stage →
    destiny sequencing, and session-log turn numbers.
-3. Use the existing patch vocabulary for each buffered turn:
+3. Use the existing patch vocabulary for each noted turn:
    `world_state`, `present_entities_*`, `active_threads_*`,
    `objectives_*`, `relationship_updates`, `open_loops_*`,
    `inventory_*`, `hidden_truths_append`, `conflict_open`,
@@ -193,14 +191,14 @@ exceed 5.
 4. Validate each turn patch against `tools/_models.py` before applying
    the next one. Drop invalid sub-patches and append `DivergenceNote`
    entries rather than overwriting broken state with guesses.
-5. Persist after every buffered turn has been applied:
-   - `world_state.json` with `turn` advanced once per buffered turn;
+5. Persist after every noted turn has been applied:
+   - `world_state.json` with `turn` advanced once per noted turn;
    - `relationship_state.json`;
    - `open_loops.json`;
    - `player.json` mirrored from `world_state.player`;
-   - one `session_log.jsonl` entry per buffered turn;
+   - one `session_log.jsonl` entry per noted turn;
    - `meta.json::hidden_truths` and `divergences.jsonl` as needed.
-6. After that, render/lint only once after every buffered turn has been applied:
+6. After that, render/lint only once after every noted turn has been applied:
 
    ```bash
    python tools/render_save.py --save <pack>/<save_id>
@@ -209,13 +207,13 @@ exceed 5.
 
 7. If lint exits 1, fix before replying. If lint exits 0, refresh the
    active summary with `inspect_save.py --active-summary`, clear the
-   pending buffer, and reply to the user.
+   private notes, and reply to the user.
 
 ### Mode C · Immediate Checkpoint Turn
 
-Use this path whenever an immediate trigger fires. Same as scheduled
-checkpoint mode, except the current trigger must be persisted before the
-reply. Examples:
+Use this path whenever an immediate trigger fires. Same as checkpoint
+mode, except the current trigger must be persisted before the reply.
+Examples:
 
 - a `player_health_state: "dead"` patch must run survival-trigger
   precedence and either persist the trigger firing or the terminal death
@@ -227,7 +225,7 @@ reply. Examples:
 - a major source-novel divergence must either be encoded in state or
   logged to `divergences.jsonl` immediately.
 
-Do not postpone an immediate trigger to the next scheduled checkpoint.
+Do not postpone an immediate trigger to a later checkpoint.
 
 ## Output Format
 
@@ -243,8 +241,13 @@ The chat reply keeps the existing player-facing shape:
 
 On checkpoint turns, copy the compact HUD line from freshly rendered
 `current_scene.md` after `render_save.py` succeeds. On ordinary turns,
-derive the same line from the active summary + pending buffer and keep
+derive the same line from the active summary + private notes and keep
 it provisional until the next checkpoint.
+
+Do not output internal state-management text. The chat reply must not
+contain private turn notes, checkpoint reasoning, tool commands, JSON
+patches, or bullet state deltas. Those belong only in the agent's
+private working context.
 
 ## Conditional System Reminders
 
@@ -277,4 +280,4 @@ every ordinary turn.
   malformed state from memory.
 - If the active summary and canonical files disagree at resume, canonical
   JSON wins. Rebuild the active summary from disk and discard stale
-  pending memory.
+  private notes.

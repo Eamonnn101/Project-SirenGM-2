@@ -41,9 +41,9 @@ the model to reread and rewrite the whole project state every time.
   intent, check danger/conflict, check relevant artifact/trait hooks,
   resolve with consequence, then decide whether to checkpoint.
 - **Checkpoint runtime:** ordinary turns use conversation context, a
-  compact active-state summary, and a pending buffer. Full JSON writes,
-  markdown render, and save lint happen at checkpoints.
-- **Checkpoint cadence:** default every 3 turns; maximum 5 turns.
+  compact active-state summary, and private turn notes. Full JSON
+  writes, markdown render, and save lint happen only when a checkpoint
+  is actually useful or mandatory.
 - **Immediate checkpoints:** death, critical/dead health, breakthrough,
   destiny gain/exhaustion, artifact use/exhaustion, conflict resolution,
   major scene/world/faction change, important NPC death or betrayal,
@@ -102,7 +102,7 @@ per-turn cognitive load and file I/O.
 5. Play in character. The agent follows `playbooks/play-turn.md`.
 
 During play, you can ask for a save/checkpoint at any time. The agent
-will flush pending state to canonical JSON, render markdown, lint the
+will flush unwritten state to canonical JSON, render markdown, lint the
 save, and refresh the active summary.
 
 ## Repository Layout
@@ -163,8 +163,9 @@ Rendered markdown files such as `current_scene.md`, `player.md`,
 `session_log.md`, and `hidden_truths.md` are display surfaces. They are
 regenerated from JSON and should never be scraped for canonical state.
 
-Between checkpoints, ordinary turns may carry a compact pending buffer
-inside the conversation. Any immediate-trigger fact must be flushed to
+Between checkpoints, ordinary turns may carry compact private turn notes
+inside the conversation. These notes are never part of the player-facing
+reply. Any immediate-trigger fact must be flushed to
 JSON before it is treated as durable.
 
 ## Runtime Loop
@@ -175,23 +176,24 @@ The agent uses:
 
 - recent conversation;
 - active state summary from `inspect_save.py --active-summary`;
-- pending state buffer;
+- private turn notes;
 - narrow triggered references only when needed.
 
-No full save render/lint is required unless the turn reaches the
-checkpoint interval or fires an immediate trigger.
+No full save render/lint is required unless the agent judges the state
+should be made durable, the user asks to save, or the turn fires an
+immediate trigger.
 
 ### Checkpoint Turn
 
-The agent applies buffered turns in chronological order:
+The agent applies noted turns in chronological order:
 
-1. apply one buffered turn patch;
+1. apply one noted turn patch;
 2. validate it against `tools/_models.py`;
 3. update canonical state;
 4. append that turn's session-log entry;
-5. move to the next buffered turn.
+5. move to the next noted turn.
 
-After every buffered turn has been applied, the agent renders and lints
+After every noted turn has been applied, the agent renders and lints
 once:
 
 ```bash
@@ -287,9 +289,9 @@ Important rules:
 ### v0.6.0
 
 - Added the Core Play Kernel prompt.
-- Reworked `playbooks/play-turn.md` around ordinary turns, scheduled
-  checkpoints, and immediate checkpoints.
-- Added the pending state buffer contract.
+- Reworked `playbooks/play-turn.md` around ordinary turns,
+  agent-decided checkpoints, and immediate checkpoints.
+- Added the private turn-notes contract.
 - Added `inspect_save.py --active-summary`.
 - Changed runtime guidance so full save render/lint happens at
   checkpoints instead of every turn.

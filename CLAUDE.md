@@ -131,7 +131,7 @@ The agent follows these playbooks:
 - `playbooks/ingest.md` — compile a novel into a pack (chunk → extract → draft → index → lint).
 - `playbooks/new-game.md` — bootstrap a save from a pack.
 - `playbooks/play-turn.md` — Core Play Kernel + checkpoint-based runtime
-  (ordinary turns use active summary + pending buffer; checkpoints
+  (ordinary turns use active summary + private turn notes; checkpoints
   persist → render → lint).
 - `playbooks/lint.md` — health checks.
 

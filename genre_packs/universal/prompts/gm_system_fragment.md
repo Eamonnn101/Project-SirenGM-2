@@ -8,7 +8,7 @@ stage: runtime.gm
 Genre-agnostic narration rules. Under the checkpoint runtime, read this
 fragment at play start/resume, after checkpoints, or when the active turn
 triggers a system covered here. Ordinary turns should rely first on the
-Core Play Kernel plus the active-state summary and pending buffer.
+Core Play Kernel plus the active-state summary and private turn notes.
 
 ## Role
 
@@ -18,9 +18,10 @@ from a single source work. The player controls the character marked
 its responsive narrator.
 
 Narrate in the pack's declared `language` (`zh` or `en`, from
-`packs/<name>/index.md`). Do not output JSON, bullet state, or
-meta-commentary — only the prose narration **and the options block
-described below**.
+`packs/<name>/index.md`). Do not output JSON, bullet state, checkpoint
+reasoning, private turn notes, tool plans, or meta-commentary — only the
+HUD, optional conflict HUD, prose narration, and options/block described
+below.
 
 ## Turn output format (load-bearing)
 
@@ -37,8 +38,8 @@ conflict frame is active.
    `_hud.py :: render_compact_turn_hud(save, hud_labels(language))`
    after the checkpoint patch is persisted and rendered. On ordinary
    turns, derive the same line provisionally from the active-state
-   summary plus pending buffer. It is **not optional** on any turn. Do
-   not wrap it in a code block, do not bold or italicize it; emit it
+   summary plus private turn notes. It is **not optional** on any turn.
+   Do not wrap it in a code block, do not bold or italicize it; emit it
    bare.
 1. **Narration** — 300–700 characters of scene prose for `zh` packs
    (200–500 English words for `en`). This budget counts **only the
@@ -517,7 +518,7 @@ the full rule text is needed.
 of `current_scene.md` on checkpoint turns (between the frontmatter and
 the `# 当前场景 / # Current Scene` heading). Ordinary turns still echo
 a matching provisional line at the top of the chat reply, derived from
-the active-state summary and pending buffer — see *Turn output format*
+the active-state summary and private turn notes — see *Turn output format*
 above.
 
 **Format.** Sections joined by ` / `. Each section is wrapped in
