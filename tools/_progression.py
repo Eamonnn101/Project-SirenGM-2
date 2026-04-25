@@ -1,11 +1,10 @@
 """Progression-layer helpers: survival-trigger precedence, draft bias,
 and meta-progress merging.
 
-These functions are the deterministic, testable core of the v0.5
-progression layer. The playbooks and GM prompts reference them, but
-the agent does not need to call them on every turn — they exist so
-lint/tests/inspection can reason about the same rules the agent
-follows in prose.
+These functions are the deterministic core of the v0.5 progression
+layer. The playbooks and GM prompts reference them, but the agent does
+not need to call them on every turn — they exist so lint and inspection
+can reason about the same rules the agent follows in prose.
 """
 
 from __future__ import annotations

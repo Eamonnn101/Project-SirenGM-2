@@ -1,6 +1,6 @@
 # tools/
 
-Optional deterministic helper scripts for the SirenGM 2 llm-wiki workflow.
+Optional deterministic helper scripts for the SirenGM 2 workflow.
 None of these are required for the main product path — the agent writes and
 reads files directly. They exist to make three chores cheaper than having
 the agent do them by hand:

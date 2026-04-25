@@ -102,7 +102,6 @@ Project SirenGM 2/
   AGENTS.md                  Codex entry point
   CLAUDE.md                  Agent operating schema
   README.md                  Project overview
-  llm-wiki.md                Design inspiration
   pyproject.toml             Optional Python tooling package
 
   raw/novel/                 Immutable source novels

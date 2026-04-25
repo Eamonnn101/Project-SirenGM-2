@@ -15,6 +15,10 @@ dist/
 # Test caches
 .pytest_cache/
 
+# Local-only development artifacts
+docs/
+tests/
+
 # User-supplied novels are immutable input; only the directory README is tracked.
 raw/novel/*
 !raw/novel/README.md
