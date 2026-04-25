@@ -96,7 +96,7 @@ turn:
    - `conflict_resolve` if a conflict is live, with the death as
      the outcome and `world_change` naming the terminal event
      (also appended to `hidden_truths` via the existing path).
-2. **File writes (play-turn.md Step 3/4 + death flow):**
+2. **File writes (play-turn.md immediate checkpoint + death flow):**
    - Normal persist to `world_state.json`, `player.json`, append
      to `session_log.jsonl`.
    - Write `saves/<pack>/<save_id>/run_summary.md` — 200-400
@@ -105,7 +105,7 @@ turn:
    - Update `saves/<pack>/meta_progress.json` via
      `merge_run_into_meta(meta, player=..., save_id=..., turn=...,
      outcome="death", cause=...)` from `tools/_progression.py`.
-   - Normal `render_save.py` + `lint_save.py` exit 0 before the
+   - Checkpoint `render_save.py` + `lint_save.py` exit 0 before the
      reply.
 
 ## Patch + file-write obligations (completion path)

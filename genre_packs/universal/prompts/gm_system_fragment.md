@@ -5,9 +5,10 @@ stage: runtime.gm
 
 # GM · Universal narrator instructions
 
-Genre-agnostic narration rules. Read once at the start of every
-`playbooks/play-turn.md` turn, after loading the save's structured
-state and the user pack's novel-specific files.
+Genre-agnostic narration rules. Under the checkpoint runtime, read this
+fragment at play start/resume, after checkpoints, or when the active turn
+triggers a system covered here. Ordinary turns should rely first on the
+Core Play Kernel plus the active-state summary and pending buffer.
 
 ## Role
 
@@ -32,12 +33,13 @@ conflict frame is active.
    the chat reply, followed by one blank line. This is the
    player's persistent state read-out (turn, innate traits,
    artifact, health, plus optional destiny and triggerable
-   segments). The exact text comes from `_hud.py ::
-   render_compact_turn_hud(save, hud_labels(language))` evaluated
-   **after this turn's patch is persisted** — i.e. the HUD
-   reflects the post-patch state the player is about to see. It
-   is **not optional** on any turn. Do not wrap it in a code
-   block, do not bold or italicize it; emit it bare.
+   segments). On checkpoint turns, the exact text comes from
+   `_hud.py :: render_compact_turn_hud(save, hud_labels(language))`
+   after the checkpoint patch is persisted and rendered. On ordinary
+   turns, derive the same line provisionally from the active-state
+   summary plus pending buffer. It is **not optional** on any turn. Do
+   not wrap it in a code block, do not bold or italicize it; emit it
+   bare.
 1. **Narration** — 300–700 characters of scene prose for `zh` packs
    (200–500 English words for `en`). This budget counts **only the
    narration prose**; the HUD lines and options block are excluded
@@ -504,16 +506,19 @@ traits, a health ladder, death, and light meta. Mechanical seeds
 live in `genre_packs/universal/systems/` (`stages.md`,
 `artifacts.md`, `innate_traits.md`, `destiny_traits.md`,
 `health_and_death.md`, `meta_progression.md`). Novel-themed
-instances live in each user pack's `progression_rules.md`. The GM
-reads both on every turn.
+instances live in each user pack's `progression_rules.md`. The GM reads
+both at play start/resume, after checkpoints, and when a progression
+system is triggered; ordinary turns use the active-state summary unless
+the full rule text is needed.
 
 ### Compact turn HUD (load-bearing display)
 
 `render_save.py` writes a single-line compact turn HUD at the top
-of `current_scene.md` on every turn (between the frontmatter and
-the `# 当前场景 / # Current Scene` heading). The same line is
-echoed verbatim at the very top of the chat reply — see *Turn
-output format* above.
+of `current_scene.md` on checkpoint turns (between the frontmatter and
+the `# 当前场景 / # Current Scene` heading). Ordinary turns still echo
+a matching provisional line at the top of the chat reply, derived from
+the active-state summary and pending buffer — see *Turn output format*
+above.
 
 **Format.** Sections joined by ` / `. Each section is wrapped in
 `〔 〕` (CJK brackets) for both zh and en packs.

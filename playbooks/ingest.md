@@ -149,13 +149,14 @@ Then, in this order, write:
    - Hard canon (resurrection, time travel, cross-world — on/off).
    - Naming conventions.
 
-   Keep it tight — the GM reads it on every turn.
+   Keep it tight — the GM reads it at play start/resume, after
+   checkpoints, and when hard canon is triggered.
 
 3. `packs/<slug>/progression_rules.md` — the novel-themed
    re-skinning of the universal progression-layer seeds. The GM
-   reads this at new-game (artifact + innate pick) and at every
-   breakthrough (destiny pick). **Seven required sections**, in
-   the pack's declared language:
+   reads this at new-game (artifact + innate pick), at play
+   start/resume/checkpoint, and at every breakthrough (destiny pick).
+   **Seven required sections**, in the pack's declared language:
    1. Stages (6) — novel-themed label + 1-paragraph description
       per `stage_index` 0..5.
    2. Breakthrough triggers per stage — 2–4 novel-themed trigger

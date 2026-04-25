@@ -29,8 +29,9 @@ stable so lint, meta, and draft-bias can reason across packs.
 ## Stage advance guidance (soft)
 
 Breakthroughs are the GM's call. The rules below are loadbearing
-discipline — not hard lints — and live here so the agent can read
-them on every turn.
+discipline — not hard lints — and live here so the agent can load
+them at start/resume, after checkpoints, or when a breakthrough may
+be triggered.
 
 - **Max 5 advances per run.** From 0 → 5, never more.
 - **Never on a non-climactic turn.** A breakthrough landing during

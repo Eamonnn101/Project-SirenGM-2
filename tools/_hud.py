@@ -3,7 +3,8 @@
 Produces the two-layer text HUD described in the v0.5 plan:
 
 - `render_compact_turn_hud`  — Layer A, written at the top of
-  `current_scene.md` every turn.
+  `current_scene.md` at checkpoints and mirrored provisionally in
+  ordinary chat turns.
 - `render_full_build_hud`    — Layer B, written into `player.md` and
   mirrored by `inspect_save.py`.
 

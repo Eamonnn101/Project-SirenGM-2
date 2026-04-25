@@ -2,514 +2,327 @@
 
 **AI compiles a novel into a playable world.**
 
-A file-driven, agent-native MVP. Drop a novel (any genre; Chinese or
-English text) into `raw/novel/`, ask the agent to ingest it, and the
-agent compiles it into a runnable Story Pack. Then play 20–50 turns
-against that pack with persistent state — using only file I/O and
-the agent's own LLM calls, no custom runtime.
+SirenGM 2 is a file-driven, agent-native story game framework. Drop a
+Chinese or English novel into `raw/novel/`, ask the agent to ingest it,
+and the project compiles the source into a playable Story Pack. You then
+play 20-50 turns against that pack while the agent maintains structured
+save state, rendered markdown, conflict frames, progression, health, and
+run history.
 
-The thesis is **"compile novel → playable world,"** not "play inside a
-prebuilt world." There is no ready-made sample pack; the product path
-is ingest.
+The product path is:
 
-The pattern is adapted from [llm-wiki](./llm-wiki.md): raw sources are
-immutable, the pack is an LLM-maintained persistent middle layer, and
-runtime reads from the compiled pack + structured save instead of
-re-deriving from raw text on every turn.
+```text
+novel text -> generated pack -> checkpointed save -> playable run
+```
 
-**Version: v0.5.1** — patch release on top of v0.5's progression
-layer. Same feature surface (build, breakthroughs, real ending),
-with a slimmer HUD and a much less chatty trait system after
-playtest:
+There is no app server, daemon, web UI, or custom game CLI. Claude Code
+or Codex is the runtime; the repo supplies prompts, playbooks, schemas,
+and deterministic helper tools.
 
-- **1 artifact + 3 innate traits** chosen at new-game (from 3 and 5
-  universal archetype seeds).
-- **6 narrative stages** with GM-judged breakthroughs against the
-  per-stage trigger patterns in each pack's
-  `progression_rules.md`.
-- **1-of-3 destiny pick per breakthrough** drawn from 12 universal
-  seeds (max 5 picks per run).
-- **5-state health ladder** (`healthy → hurt → badly_hurt →
-  critical → dead`) with locked **survival-trigger precedence**
-  (`bond_rescue` artifact → `not_meant_to_die` → `last_barrier`)
-  checked before any fatal patch becomes terminal.
-- **Terminal death + clean completion** flows that write
-  `run_summary.md` and update per-pack
-  `saves/<pack>/meta_progress.json` (counters, seen-pool coverage,
-  death history). **Unseen-first draft bias** on the menus until
-  ~70% pool coverage, then free draw.
-- **Single-line compact HUD** at the top of every chat reply:
-  `第 N 回 / 〔innate1〕〔innate2〕〔innate3〕 / 〔法宝・<name>〕 /
-  〔体况・<state>〕`, with optional `〔命格・…〕` and
-  `〔可发动・…〕` segments. Full build HUD (stage label,
-  activation contracts, exhausted flags, meta archive) lives in
-  `player.md` and `inspect_save.py`.
-- **BG3-style labeled options** (`〔法宝・<名>〕` / `〔才华〕` /
-  `〔命格・<名>〕`), surfaced **only on key beats** (conflict
-  open / escalation / endgame, health crisis, lethal risk, major
-  branching decision, investigation breakthrough, social pivot).
-  Default cadence: zero per turn; **at most one labeled option
-  per turn**, total.
+## Current Version
 
-No XP, no numeric levels, no HP bar — every layer stays narrative.
-The universal genre pack ships mechanic seeds; ingest re-themes
-them into each user pack so the same mechanics work for wuxia,
-sci-fi, political drama, romance, etc.
+**v0.6.0 - Core Play Kernel + checkpoint runtime**
 
-v0.4 (still live) shipped **pacing discipline** on the conflict
-engine — `beat_budget`, two-pivot density, endgame HUD — see
-[Changelog](#changelog) for the full list.
+This release focuses on performance and weak-model compatibility. The
+full gameplay surface remains intact, but ordinary turns no longer ask
+the model to reread and rewrite the whole project state every time.
+
+- **Core Play Kernel:** every turn follows five stable rules: understand
+  intent, check danger/conflict, check relevant artifact/trait hooks,
+  resolve with consequence, then decide whether to checkpoint.
+- **Checkpoint runtime:** ordinary turns use conversation context, a
+  compact active-state summary, and a pending buffer. Full JSON writes,
+  markdown render, and save lint happen at checkpoints.
+- **Checkpoint cadence:** default every 3 turns; maximum 5 turns.
+- **Immediate checkpoints:** death, critical/dead health, breakthrough,
+  destiny gain/exhaustion, artifact use/exhaustion, conflict resolution,
+  major scene/world/faction change, important NPC death or betrayal,
+  restart, explicit save request, or major source-novel divergence.
+- **Active summary support:** `tools/inspect_save.py --active-summary`
+  prints the compact state seed used between checkpoints, including the
+  canonical HUD line.
+
+The goal is simple: preserve SirenGM's core experience while reducing
+per-turn cognitive load and file I/O.
 
 ## Quickstart
 
-1. **Clone** this repo and open it in Claude Code (or Codex).
-2. **Drop a novel** into `raw/novel/` as `.txt` or `.md` — one file
-   becomes one pack. Non-text formats (PDF, EPUB, images) must be
-   converted to plain text first; subdirectories aren't recursed.
+1. Open this repo in Claude Code or Codex.
+
+2. Add a plain-text novel:
+
    ```bash
    cp my_novel.txt raw/novel/
    ```
-3. **Ingest.** Tell the agent:
-   > "导入小说" / "Ingest novels"
 
-   The agent scans `raw/novel/`, derives slugs from filenames
-   (`My Cool Book.txt` → `my_cool_book`), prints a pre-scan
-   (source → slug → action), and after you confirm, compiles each
-   novel into `packs/<slug>/` with a Stage-0 checkpoint per book so
-   you can catch setting misreads early. Expect 10–60 minutes per
-   novel. Already-ingested packs are skipped unless you say
-   "re-ingest".
+   Supported inputs are `.txt` and `.md`. Convert PDF, EPUB, images, or
+   other formats to text first.
 
-   To name a single pack yourself:
-   > "将 `raw/novel/my_novel.txt` 导入为 pack `mypack`" /
-   > "Ingest `raw/novel/my_novel.txt` as pack `mypack`"
+3. Ask the agent to ingest:
 
-4. **New game.** Tell the agent:
-   > "开始游戏" / "Start a new game"
+   ```text
+   导入小说
+   ```
 
-   It picks the pack (asking if more than one exists), auto-numbers
-   the save as `save_001` / `save_002` / …, and writes under
-   `saves/<pack>/<save_id>/`. Each pack owns its own save namespace.
+   or:
 
-5. **Play.** Send in-character text. The agent follows
-   [`playbooks/play-turn.md`](./playbooks/play-turn.md).
+   ```text
+   Ingest novels
+   ```
 
-There is no CLI. The agent is the CLI.
+   The agent follows `playbooks/ingest.md`, scans `raw/novel/`, derives
+   pack slugs from filenames, and writes each compiled pack under
+   `packs/<pack>/`.
+
+4. Start a run:
+
+   ```text
+   开始游戏
+   ```
+
+   or:
+
+   ```text
+   Start a new game
+   ```
+
+   The agent follows `playbooks/new-game.md`, creates
+   `saves/<pack>/<save_id>/`, and initializes the player build.
+
+5. Play in character. The agent follows `playbooks/play-turn.md`.
+
+During play, you can ask for a save/checkpoint at any time. The agent
+will flush pending state to canonical JSON, render markdown, lint the
+save, and refresh the active summary.
+
+## Repository Layout
+
+```text
+Project SirenGM 2/
+  AGENTS.md                  Codex entry point
+  CLAUDE.md                  Agent operating schema
+  README.md                  Project overview
+  llm-wiki.md                Design inspiration
+  pyproject.toml             Optional Python tooling package
+
+  raw/novel/                 Immutable source novels
+  genre_packs/universal/     Shipped universal genre layer
+  packs/<pack>/              Generated user packs
+  saves/<pack>/<save_id>/    Per-pack run saves
+
+  playbooks/                 Agent workflows
+  tools/                     Deterministic helper scripts
+```
+
+Generated packs and saves are local working artifacts. The shipped core
+is the universal genre layer, playbooks, schemas, prompts, and helper
+tools.
 
 ## Architecture
 
-```
-  raw/novel/              ←  your novel text (immutable)
-        │
-        │  agent reads playbooks/ingest.md
-        ▼
-  genre_packs/universal/  ←  shipped genre-agnostic template
-        │ +                   (style, guardrails, schemas, prompts)
-        ▼
-  packs/<user_pack>/      ←  generated user pack: language, novel_rules,
-                              characters, factions, locations, arcs, events
-        │ +
-        ▼
-  saves/<pack>/<save_id>/ ←  per-run state, one namespace per pack
-                              •  world_state.json          (CANONICAL)
-                              •  relationship_state.json   (CANONICAL)
-                              •  open_loops.json           (CANONICAL)
-                              •  player.json               (CANONICAL)
-                              •  session_log.jsonl         (CANONICAL, append-only)
-                              •  current_scene.md / session_log.md / …  (rendered only)
+SirenGM uses three layers:
+
+```text
+raw/novel/
+  immutable source text
+
+genre_packs/universal/
+  genre-agnostic schemas, prompts, guardrails, systems
+
+packs/<pack>/
+  generated wiki for one source novel:
+  novel_rules, canon guardrails, characters, factions, locations,
+  arcs, events, relationships, progression rules
+
+saves/<pack>/<save_id>/
+  canonical JSON + rendered markdown for one run
 ```
 
-**Rule of the architecture.** Structured JSON is the single source of
-truth. Markdown surfaces are re-rendered from JSON after every patch.
-If narrator prose and structured state disagree, structured state wins.
+### Source Of Truth
 
-**Scene context derives from structured state.** The GM reads
-`world_state.present_entities`, `current_location`, and
-`active_threads` directly; markdown is never scraped for scene facts.
-`active_threads` and `current_objectives` are explicit **soft
-suggestions** — player input wins when it diverges.
+Structured JSON is authoritative at checkpoints:
 
-## The conflict engine (v0.3/v0.4)
+- `world_state.json`
+- `relationship_state.json`
+- `open_loops.json`
+- `player.json`
+- `meta.json`
+- `session_log.jsonl`
+- `divergences.jsonl`
 
-A cross-genre bookkeeping layer for scenes of tension — combat,
-debate, chase, negotiation, trial, cultivation-ordeal. The GM opens
-a `ConflictFrame` in `world_state.current_conflict` whenever the
-scene has ≥2 identifiable parties with opposing wants and the
-outcome would change the state of the world. Nothing combat-specific
-about it; the `kind` field is free-form ("辩论", "追逐", "debate",
-"hostage-trade", …) and the GM picks it per scene.
+Rendered markdown files such as `current_scene.md`, `player.md`,
+`session_log.md`, and `hidden_truths.md` are display surfaces. They are
+regenerated from JSON and should never be scraped for canonical state.
 
-Each frame tracks five things — the same five questions regardless
-of genre:
+Between checkpoints, ordinary turns may carry a compact pending buffer
+inside the conversation. Any immediate-trigger fact must be flushed to
+JSON before it is treated as durable.
 
-| field                 | what it answers                                                        |
-| --------------------- | ---------------------------------------------------------------------- |
-| `stake`               | what both sides are fighting over                                      |
-| `sides`               | named parties with their members, `want`, and a running `paid` ledger  |
-| `momentum`            | `setup` / `player_pressing` / `even` / `opposition_pressing` / `reversal_imminent` |
-| `escalation_notes`    | pivotal beats that shifted the scene                                   |
-| `world_change` (at resolve) | what the resolution changed in canonical state                   |
+## Runtime Loop
 
-**Player visibility.** When a frame is active, every GM reply
-prepends a single-line HUD above the prose:
+### Ordinary Turn
 
+The agent uses:
+
+- recent conversation;
+- active state summary from `inspect_save.py --active-summary`;
+- pending state buffer;
+- narrow triggered references only when needed.
+
+No full save render/lint is required unless the turn reaches the
+checkpoint interval or fires an immediate trigger.
+
+### Checkpoint Turn
+
+The agent applies buffered turns in chronological order:
+
+1. apply one buffered turn patch;
+2. validate it against `tools/_models.py`;
+3. update canonical state;
+4. append that turn's session-log entry;
+5. move to the next buffered turn.
+
+After every buffered turn has been applied, the agent renders and lints
+once:
+
+```bash
+python tools/render_save.py --save <pack>/<save_id>
+python tools/lint_save.py --save <pack>/<save_id>
+python tools/inspect_save.py --save <pack>/<save_id> --active-summary
 ```
-〔冲突・追逐｜势头：对立方紧逼｜你方已付：虎口受伤、退路被封｜对立方已付：—〕
-```
 
-The English-pack equivalent is `[Conflict · chase | Momentum:
-Opposition pressing | You paid: bruised hand, escape cut off |
-Opposition paid: —]`. At least one of the four options every conflict
-turn must push momentum — escalate, de-escalate, pay a cost, attempt
-a reversal. Tactic tags tie to the conflict's `kind` ("辩锋",
-"剑势", "截击", "press-advantage"), not generic labels.
+This preserves ordered effects such as conflict ledgers, survival-trigger
+precedence, stage breakthrough into destiny pick, and session-log turn
+numbers without paying full I/O cost every ordinary turn.
 
-**Lifecycle.** Three patch keys drive the frame:
+## Core Gameplay Systems
 
-- `conflict_open` — install a new frame. Rejected with a divergence
-  if one is already active.
-- `conflict_update` — per-turn delta: `momentum`, optional
-  `escalation_note`, `side_updates.<label>.paid_add`. Every update
-  turn must record at least one concrete `paid_add` on the side that
-  absorbed a cost — the paid ledger is what the HUD reads.
-- `conflict_resolve` — `{outcome, momentum_final, world_change}`
-  plus the matching `relationship_updates`, `open_loops_close`,
-  `open_loops_add`, `inventory_*`. Writes a `ConflictSummary` into
-  `world_state.last_conflict_summary` so `current_scene.md` retains
-  a "上一场冲突 / Last Conflict" block until the next frame opens.
+- **Universal genre pack:** one shipped universal layer supports wuxia,
+  sci-fi, political drama, romance, mystery, and other prose genres.
+- **Per-novel rules:** each generated pack owns its `novel_rules.md`,
+  canon guardrails, progression labels, and world entities.
+- **Conflict frames:** any high-tension scene can become a structured
+  `ConflictFrame` with sides, stakes, momentum, paid costs, escalation,
+  and resolution writeback.
+- **Pacing budget:** conflicts carry a 3-6 beat budget. The GM pushes
+  toward decisive endgame beats instead of letting scenes drift.
+- **Player build:** each run has one artifact, three innate traits, and
+  breakthrough-earned destiny traits.
+- **Progression:** six narrative stages, with GM-judged breakthroughs
+  against each pack's source-novel trigger patterns.
+- **Health and death:** five-state narrative health ladder:
+  `healthy -> hurt -> badly_hurt -> critical -> dead`.
+- **Survival precedence:** before terminal death, the runtime checks
+  `bond_rescue`, then `not_meant_to_die`, then `last_barrier`.
+- **Meta progression:** per-pack run history tracks completions, deaths,
+  best stage, and seen archetypes for draft variety.
+- **Compact HUD:** each player-facing turn begins with a single line
+  summarizing turn, innate traits, artifact, health, destiny, and
+  triggerable hooks.
 
-**Post-resolution trace.** After resolve, the scene doesn't snap
-back to "nothing happened" — `last_conflict_summary` preserves
-`kind`, `stake`, `outcome`, `momentum_final`, `resolved_turn` and is
-rendered into `current_scene.md` until a new `conflict_open` takes
-over.
-
-**Pacing discipline (v0.4).** Every frame carries a `beat_budget`
-integer (3–6, default 4) set at `conflict_open` based on the scope
-of the scene — 3 for a brawl or short chase, 4 for general combat,
-5 for debate or negotiation, 6 for a siege. Remaining beats are
-derived on the fly as `beat_budget - (world.turn - opened_turn)`; no
-counter is stored, no patch mutates it. When `remaining` reaches 1,
-one of A/B/C must be a **decisive** (`收束型 / 一击定音`) move that
-could end the frame if it lands, and `current_scene.md` swaps the
-`势头 / Momentum` field for `收束在即 / Endgame`. At `remaining == 0`
-the turn should resolve (player wins, opposition wins, even + world
-change, or player disengages). One turn of overshoot is tolerated for
-a reveal that needs to play out; beyond that, `tools/lint_save.py`
-warns.
-
-Paired with the pacing budget is a **doubled beat density**: a turn
-plays the current beat through **two pivots** (action lands → first
-NPC reaction that changes the situation → complication on top) rather
-than one. What used to take two turns of micro-exchange
-(抢腕 → 藏针被拍偏 → 毒掌提起) now lands in a single turn.
-
-Outside conflicts, the GM may also compress time when the player's
-input is routine — travel, rest, shopping, waiting, montage. A goal
-like "I ride to 嘉兴" fast-forwards hours or days to the next point
-of tension instead of narrating every saddle check. Inside an active
-conflict frame this is explicitly forbidden — every turn there is one
-beat inside the frame.
-
-Momentum itself remains a discrete label, never a number. Keeps the
-engine off the numeric-combat-stat slope and keeps narration literary.
-
-See
-[`genre_packs/universal/prompts/gm_system_fragment.md`](./genre_packs/universal/prompts/gm_system_fragment.md)
-for the GM-side rules, [`playbooks/play-turn.md`](./playbooks/play-turn.md)
-for the lifecycle in context, and
-[`tools/_models.py`](./tools/_models.py) for the Pydantic schemas.
+All mechanics stay narrative. There is no XP, HP bar, damage formula, or
+numeric combat stat layer.
 
 ## Tools
 
-A thin `tools/` layer helps the agent with chores. None are required
-for gameplay; the agent invokes them where the playbook calls for
-deterministic checks or re-rendering.
+The scripts in `tools/` are deterministic helpers. They do not call an
+LLM.
 
-| script | purpose |
+| script | use |
 |---|---|
-| `python tools/chunker.py <novel> --pack <pack>` | Split a raw novel into chapter chunks under `packs/<pack>/.ingest/chunks.jsonl`. |
-| `python tools/lint_pack.py --pack <pack>` / `--genre <name>` | Validate a user or genre pack (required files, schemas, cross-refs, orphan wiki-links, bare slugs on non-ASCII-named entities). |
-| `python tools/lint_save.py --save <pack>/<save_id>` | Validate a save: JSON legality, `turn ≡ len(session_log)`, `player.json ≡ world_state.player`, rendered-surface drift, slug existence, stale conflict frames. |
-| `python tools/render_save.py --save <pack>/<save_id>` | Re-render markdown surfaces (including the current- and last-conflict blocks) from JSON. Load-bearing: run after every turn. |
-| `python tools/render_pack.py --pack <pack>` | Expand the pack's `[[slug\|Display]]` wiki-links into plain Markdown links under `packs/<pack>/_rendered/` for non-wikilink readers. |
-| `python tools/inspect_save.py --save <pack>/<save_id>` | One-screen plain-text state summary. |
+| `python tools/chunker.py <novel> --pack <pack>` | Split source text into ingest chunks. |
+| `python tools/lint_pack.py --pack <pack>` | Validate a generated user pack. |
+| `python tools/lint_pack.py --genre universal` | Validate the shipped universal genre pack. |
+| `python tools/render_save.py --save <pack>/<save_id>` | Render markdown surfaces from canonical JSON. |
+| `python tools/lint_save.py --save <pack>/<save_id>` | Validate a checkpointed save. |
+| `python tools/inspect_save.py --save <pack>/<save_id>` | Print a compact save summary. |
+| `python tools/inspect_save.py --save <pack>/<save_id> --active-summary` | Print the active-state seed for checkpoint runtime. |
 
-### Setup
-
-Only needed if you want to run the tools yourself:
+Optional local setup:
 
 ```bash
 uv venv --python 3.10 .venv
 uv pip install -e .
-# macOS-in-Documents quirk: unhide .pth files so editable imports work
-chflags -R nohidden .venv
 ```
 
-If your shell has no global `python`, use `.venv/bin/python` (or
-activate the venv first). See [`tools/README.md`](./tools/README.md).
+If your shell has no global `python`, use `.venv/bin/python`.
 
-### Smoke check
+Smoke check:
 
 ```bash
-python tools/lint_pack.py --genre universal   # exits 0 when clean
+python tools/lint_pack.py --genre universal
 ```
 
-Once you've ingested a novel and started a save, the per-turn chain
-is `render_save.py → lint_save.py → inspect_save.py`. The playbooks
-call these at the appropriate points.
+## Agent Workflow
+
+The agent reads the relevant playbook before acting:
+
+- `playbooks/ingest.md` - compile novels into packs.
+- `playbooks/new-game.md` - create a save and initial build.
+- `playbooks/play-turn.md` - run ordinary and checkpoint turns.
+- `playbooks/death-and-restart.md` - handle death, completion, and restart.
+- `playbooks/lint.md` - inspect pack/save health.
+
+Important rules:
+
+- Do not modify `raw/novel/`; source text is immutable.
+- Do not scrape rendered markdown for state; JSON wins.
+- Do not force the player back to preset arcs; active threads are soft
+  suggestions.
+- Do not invent durable facts that cannot be patched into structured
+  state; log a divergence instead.
+- Do not add a new product CLI, web UI, daemon, or network runtime.
 
 ## Changelog
 
-### v0.5.1 — HUD simplification + labeled-option pacing
+### v0.6.0
 
-Patch release on top of v0.5. Two playtest-driven fixes; no
-schema or save-file changes; all 71 existing tests still pass.
+- Added the Core Play Kernel prompt.
+- Reworked `playbooks/play-turn.md` around ordinary turns, scheduled
+  checkpoints, and immediate checkpoints.
+- Added the pending state buffer contract.
+- Added `inspect_save.py --active-summary`.
+- Changed runtime guidance so full save render/lint happens at
+  checkpoints instead of every turn.
 
-- **Compact HUD slimmed to a single line.** v0.5's Unicode-boxed
-  multi-row HUD ate visual space and competed with the narration
-  budget. Replaced with a single bare-line format:
+### v0.5.x
 
-  ```
-  第 29 回 / 〔悟性过人〕〔以诚动人〕〔奇缘不断〕 / 〔法宝・观机古镜〕 / 〔体况・健康〕
-  ```
+- Added the progression layer: artifact, innate traits, destiny traits,
+  six narrative stages, breakthroughs, health/death, completion, and
+  meta progression.
+- Simplified the compact HUD into a single player-facing line.
+- Tightened labeled special options so build hooks surface only on key
+  beats and at most once per turn.
 
-  Sections joined by ` / `; each wrapped in `〔 〕`. Ready
-  artifact status is implicit (no marker); used artifacts get a
-  trailing `· 已用 / · used` inside the bracket. Health
-  warnings inline (`· ⚠`, `· ⚠⚠`, `· ☠`). Optional trailing
-  `〔命格・<name>〕…` per destiny trait, and
-  `〔可发动・<list>〕` when the situation is salient.
-- **Compact HUD now appears in chat reply.** v0.5's HUD lived
-  only in `current_scene.md`; chat-only LLM testers never saw it.
-  Step 5 of `playbooks/play-turn.md` now requires the bare HUD
-  line at the top of every reply, alongside the existing single-
-  line conflict HUD on conflict turns. Breakthrough/death turns
-  also keep the HUD line.
-- **Labeled-option cadence tightened.** v0.5's "frequent in
-  meaningful scenes" wording produced a `[Talent]` option on
-  almost every conflict turn, including quiet
-  thinking-it-through beats. Replaced with an explicit *Key
-  beats* list — conflict open / escalation / endgame, health
-  crisis, lethal risk, major branching decision, investigation
-  breakthrough, social pivot. **Default: zero labeled options
-  per turn.** **At most one labeled option per turn, total**,
-  across artifact + innate + destiny combined.
-- **Renderer salience tightened.** The HUD's `Triggerable`
-  segment now fires only on real pivots: conflict at a pivot
-  beat (just opened / endgame / `reversal_imminent`),
-  `health_state` ∈ {`badly_hurt`, `critical`}, or
-  `risk_level == "lethal"`. Generic `tense` risk and quiet
-  mid-conflict pacing turns no longer trigger.
-  Per-archetype eligibility tables in
-  `genre_packs/universal/systems/innate_traits.md`,
-  `artifacts.md`, and `destiny_traits.md` synchronized with
-  the renderer's heuristic (`tools/_hud.py`).
-- **Internals cleanup.** Removed the seven now-dead box-row
-  helpers in `tools/_hud.py` (`_artifact_row_value`,
-  `_innate_row_value`, `_destiny_row_value`, `_conflict_row_value`,
-  `_goals_row_value`, `_threads_row_value`,
-  `_format_label_value_rows`) and their unused label keys
-  (`risk_warn_*`, `momentum_*`, `used_marker`, `ready_marker`,
-  `destiny_sep`, `conflict_row_sep`, etc.). The Layer B build
-  HUD inside `player.md` is unchanged.
+### v0.4
 
-Files touched: `tools/_hud.py`, `tools/render_save.py`,
-`genre_packs/universal/prompts/gm_system_fragment.md`,
-`genre_packs/universal/systems/{artifacts,innate_traits,destiny_traits}.md`,
-`playbooks/play-turn.md`,
-`docs/superpowers/specs/2026-04-24-progression-layer-design.md`.
-
-### v0.5 — Progression layer
-
-Headline feature: build, breakthroughs, and a real ending — all
-narrative, no XP / levels / HP. Mechanic seeds in
-`genre_packs/universal/systems/`; novel-themed instances per pack
-in `packs/<pack>/progression_rules.md`. See
-[`docs/superpowers/specs/2026-04-24-progression-layer-design.md`](./docs/superpowers/specs/2026-04-24-progression-layer-design.md)
-for the full design doc.
-
-- **New-game build picks.** One artifact (3 universal archetypes:
-  `insight` / `bond_rescue` / `companion`) + 3 distinct innate
-  traits (5 archetypes: `talent` / `survival` / `social` /
-  `resource` / `temperament`) chosen at new-game Steps 1.5 + 1.6.
-  Both immutable for the run.
-- **6 narrative stages.** `stage_index` 0..5 on `PlayerState`,
-  novel-themed `stage_label` from each pack's
-  `progression_rules.md`. Breakthroughs are GM-judged against
-  per-stage trigger patterns in the pack — soft rules
-  (`gm_system_fragment.md`), no hard cooldown.
-- **Destiny picks at every breakthrough.** 1-of-3 from 12
-  universal seeds grouped in four families (survival, insight,
-  desperation, companion). Distinct archetypes within a run; up
-  to 5 picks total. The fixed D fallback declines and lets the
-  stage advance anyway.
-- **5-state health ladder + survival-trigger precedence.**
-  `healthy → hurt → badly_hurt → critical → dead`. `critical`
-  demands priority handling on the next turn but is not a 1-turn
-  death clock. Before any fatal patch becomes terminal the engine
-  checks `bond_rescue` artifact → `not_meant_to_die` →
-  `last_barrier` in fixed order; any firing trigger transitions
-  to `critical` and marks the artifact/trait used/exhausted.
-- **Terminal death + clean completion.** Death writes
-  `run_summary.md`, bumps `deaths_count`, appends a `DeathRecord`,
-  updates `best_stage_index`. Clean completion (stage 5 reached
-  without dying) bumps `runs_finished` instead.
-- **Light meta progression.** `saves/<pack>/meta_progress.json`
-  tracks counters (`runs_started` / `runs_finished` /
-  `deaths_count` / `best_stage_index`), archetype coverage
-  (`seen_*_archetypes`) driving the **unseen-first draft bias**
-  on artifact / innate / destiny menus until ~70% pool coverage,
-  novel-themed slug coverage for flavor variation, and a death
-  history. Not an unlock tree — every archetype is available on
-  every run.
-- **Two-layer textual HUD.** `tools/_hud.py` renders a Unicode
-  boxed compact turn HUD at the top of `current_scene.md` every
-  turn (stage / health / artifact / innate / destiny / conflict /
-  goals / threads with warning markers) and a full build HUD in
-  `player.md` + `inspect_save.py` (activation contracts,
-  exhausted flags, pack-archive meta summary). zh / en parity,
-  CJK-aware visual width.
-- **Extended lint.** `lint_save.py` enforces new invariants —
-  innate length + 3 distinct archetypes, destiny count ≤
-  stage_index + distinct source_stages, artifact required on
-  every persisted save, `run_summary.md` required on death,
-  compact-HUD drift detection, `meta_progress.json` shape.
-  `lint_pack.py` requires all 7 sections in each user pack's
-  `progression_rules.md` (case-insensitive heading match).
-- **Tests.** `tests/test_player_progression.py` — 54 stdlib
-  `unittest` cases covering model validation, survival-trigger
-  precedence, draft bias (incl. coverage-against decoupling),
-  meta merge, lint gates on turn-zero saves, and case-insensitive
-  progression-section matching. Combined with v0.4 conflict
-  tests: 71 / 71 green. Run:
-  `python -m unittest tests.test_conflict_budget tests.test_player_progression`.
-
-### v0.4 — Pacing discipline
-
-- **Conflict pacing budget.** `ConflictFrame.beat_budget` (int, 3–6,
-  default 4) set once at `conflict_open`; remaining beats derived as
-  `beat_budget - (world.turn - opened_turn)` — no auto-decrement, no
-  stored counter, no patch contract to enforce. `tools/lint_save.py`
-  warns when a frame overshoots its budget by 2+ turns (replacing the
-  old fixed "10 turns" rule).
-- **Endgame HUD.** When remaining beats drop to ≤1,
-  `current_scene.md` swaps the conflict's momentum field for
-  `收束在即 / Endgame` regardless of the underlying `momentum` value.
-  At least one of A/B/C must be a `收束型 / 一击定音` (decisive) move.
-- **Beat density doubled.** A turn now plays the current beat through
-  **two pivots** — action lands, first NPC reaction that materially
-  changes the situation, complication on top — rather than one. What
-  used to take two turns of micro-exchange now lands in one.
-- **Time compression outside conflicts.** When the player writes a
-  goal instead of a step (e.g. "I ride to 嘉兴") and nothing in
-  `present_entities`, `active_threads`, or `novel_rules.md` makes the
-  routine fraught, the GM may fast-forward hours or days to the next
-  beat that needs a decision. Forbidden inside an active conflict
-  frame.
-- **First unittest module.** `tests/test_conflict_budget.py` — 17
-  stdlib `unittest` cases against the pacing schema, lint rule, and
-  render-side endgame override. Run with
-  `python -m unittest tests.test_conflict_budget`.
+- Added conflict pacing budget, endgame HUD, denser beats, and time
+  compression outside active conflicts.
 
 ### v0.3
 
-- **Cross-genre conflict engine.** `ConflictFrame` on `world_state`
-  with named sides, momentum labels, per-side cost ledger,
-  escalation notes. Three lifecycle patch keys
-  (`conflict_open` / `conflict_update` / `conflict_resolve`).
-  In-turn HUD line, post-resolve "Last Conflict" block,
-  stale-frame lint warning. Full details
-  [above](#the-conflict-engine-v03).
-- **Beat density narration rule.** Each turn plays the current beat
-  through its pivot (action lands → NPC reactions → complication),
-  not a static tableau. The 300–700-char (zh) / 200–500-word (en)
-  narration budget measures prose only; the options block is
-  counted separately.
-- **Per-turn 3+D options.** Every turn ends with four bullets:
-  `选项A/B/C` (short tactic label + diegetic action) plus the fixed
-  free-form `选项D（自创脑洞）`. Options are persisted on
-  `SessionLogEntry.options`.
-- **Piped wiki-link dialect.** Entity cross-refs use
-  `[[slug|Display]]` — slug stays ASCII snake_case (stable for
-  tools and lint); the display label is the native-language name
-  the reader sees (`[[xiao_yan|萧炎]]`). Bare `[[slug]]` is
-  rejected when the target has a non-ASCII `name`;
-  `tools/render_pack.py` expands the dialect into plain Markdown.
-- **Language-locked packs.** User packs declare `language: zh` or
-  `language: en` in `index.md`; rendering picks localized labels
-  from a two-language dictionary. `zh` is the default when the
-  field is missing.
+- Added the cross-genre conflict engine, conflict HUD, session-log
+  options, piped wiki-links, and language-locked packs.
 
 ### v0.2
 
-- **Batch ingest.** `导入小说` / `Ingest novels` scans
-  `raw/novel/`, derives slugs from filenames, and ingests each
-  `.txt` / `.md` source in sequence with a per-novel Stage-0
-  checkpoint. Already-ingested packs (matched by `source_file`)
-  are skipped; silent slug-collapse across sources is refused.
-- **Start a game with no id.** `Start a new game` / "开始游戏" is
-  enough; the agent picks the lone pack or asks, and auto-numbers
-  saves (`save_001`, `save_002`, …) per pack.
-- **One universal genre pack.** `genre_packs/xianxia/` is gone;
-  `genre_packs/universal/` is the only shipped template. All
-  novel-specific judgment moves into each user pack's
-  `novel_rules.md` (load-bearing, synthesized at ingest time).
-- **Pack-scoped save directories.** `saves/<pack>/<save_id>/` —
-  each pack owns its save namespace, so two packs can both hold a
-  `save_001` without colliding.
-- **`tools/lint_save.py`.** New save linter: JSON validity,
-  `turn ≡ len(session_log)`, `player.json ≡ world_state.player`,
-  rendered-surface drift against the pack's localized labels, slug
-  existence when a pack is resolvable.
-- **`session_log.md` is display-only.** Canonical record lives in
-  `session_log.jsonl`; the markdown is re-rendered after every
-  turn.
-- **Event skippability defaults by kind.** `EventPage.can_skip`
-  defaults to `False` for `player_boundary` events and `True` for
-  `intended` / `triggerable`; explicit values still override.
+- Added batch ingest, pack-scoped saves, save linting, and rendered
+  session-log surfaces.
 
 ### v0.1
 
-- Initial ingest → pack → save pipeline, shipped as the
-  file-driven agent-native MVP of the llm-wiki pattern.
+- Initial file-driven ingest -> pack -> save MVP.
 
-## What's out of scope for MVP
+## Out Of Scope
 
-- Per-genre genre packs. One universal genre pack ships;
-  novel-specific rules live in each user pack's `novel_rules.md`.
-- Multiplayer, accounts, network services.
-- Web UI, TUI.
-- Numeric combat systems, damage formulas, HP bars. The conflict
-  engine deliberately uses discrete momentum labels, not numbers.
-- Images, voice, avatars.
-- Vector DB / embeddings — index-scan over the pack is enough at
-  MVP scale.
-- Any novel producing a "perfect" pack. The thesis is that ingest
-  produces a *runnable* pack with minor manual polish, not a
-  flawless one.
-
-## Directory layout
-
-```
-Project SirenGM 2/
-  CLAUDE.md                — operating schema for the agent
-  AGENTS.md                — Codex entry point (points at CLAUDE.md)
-  README.md                — this file
-  llm-wiki.md              — design inspiration
-  pyproject.toml           — tools-only Python package (optional)
-
-  genre_packs/universal/   — shipped genre-agnostic template
-  raw/novel/               — drop your novel text here (immutable)
-  packs/<pack>/            — one generated pack per novel (gitignored)
-  saves/<pack>/<save_id>/  — per-pack, per-run save states (gitignored)
-
-  playbooks/               — workflow instructions for the agent
-                              (ingest, new-game, play-turn, lint)
-  tools/                   — optional deterministic helper scripts
-```
+- Web UI, TUI, accounts, multiplayer, or hosted services.
+- Per-genre shipped genre packs.
+- Numeric combat systems.
+- Images, voice, avatars, or asset generation.
+- Vector DB or embeddings.
+- A "perfect" one-shot ingest. The target is a runnable pack with minor
+  room for manual polish.
 
 ## License
 
-Proprietary — see `pyproject.toml`. Contact the author before
-redistributing.
+Proprietary. Contact the author before redistributing.
