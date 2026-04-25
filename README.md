@@ -44,6 +44,9 @@ the model to reread and rewrite the whole project state every time.
   compact active-state summary, and private turn notes. Full JSON
   writes, markdown render, and save lint happen only when a checkpoint
   is actually useful or mandatory.
+- **Context compression:** long runs keep the full `session_log.jsonl`
+  archive, but ordinary play uses `context_summary.md` plus the recent
+  3-turn window so prompt size does not grow with every turn.
 - **Immediate checkpoints:** death, critical/dead health, breakthrough,
   destiny gain/exhaustion, artifact use/exhaustion, conflict resolution,
   major scene/world/faction change, important NPC death or betrayal,
@@ -159,9 +162,14 @@ Structured JSON is authoritative at checkpoints:
 - `session_log.jsonl`
 - `divergences.jsonl`
 
+`context_summary.md` is durable compressed memory for long runs. It is
+used for prompt context, but canonical JSON wins if they disagree.
+
 Rendered markdown files such as `current_scene.md`, `player.md`,
 `session_log.md`, and `hidden_truths.md` are display surfaces. They are
 regenerated from JSON and should never be scraped for canonical state.
+`session_log.md` shows only a recent window; the full archive remains in
+`session_log.jsonl`.
 
 Between checkpoints, ordinary turns may carry compact private turn notes
 inside the conversation. These notes are never part of the player-facing
@@ -175,6 +183,7 @@ JSON before it is treated as durable.
 The agent uses:
 
 - recent conversation;
+- compressed memory from `context_summary.md`;
 - active state summary from `inspect_save.py --active-summary`;
 - private turn notes;
 - narrow triggered references only when needed.
@@ -205,6 +214,10 @@ python tools/inspect_save.py --save <pack>/<save_id> --active-summary
 This preserves ordered effects such as conflict ledgers, survival-trigger
 precedence, stage breakthrough into destiny pick, and session-log turn
 numbers without paying full I/O cost every ordinary turn.
+
+For long runs, checkpoint also updates `context_summary.md` when the log
+passes 20 KB or 20 turns. That summary carries old story context forward
+so the LLM does not need to read the complete session archive.
 
 ## Core Gameplay Systems
 
@@ -244,10 +257,10 @@ LLM.
 | `python tools/chunker.py <novel> --pack <pack>` | Split source text into ingest chunks. |
 | `python tools/lint_pack.py --pack <pack>` | Validate a generated user pack. |
 | `python tools/lint_pack.py --genre universal` | Validate the shipped universal genre pack. |
-| `python tools/render_save.py --save <pack>/<save_id>` | Render markdown surfaces from canonical JSON. |
+| `python tools/render_save.py --save <pack>/<save_id>` | Render markdown surfaces from canonical JSON; `session_log.md` shows only recent turns. |
 | `python tools/lint_save.py --save <pack>/<save_id>` | Validate a checkpointed save. |
 | `python tools/inspect_save.py --save <pack>/<save_id>` | Print a compact save summary. |
-| `python tools/inspect_save.py --save <pack>/<save_id> --active-summary` | Print the active-state seed for checkpoint runtime. |
+| `python tools/inspect_save.py --save <pack>/<save_id> --active-summary` | Print context summary, recent turns, and the active-state seed. |
 
 Optional local setup:
 
@@ -295,6 +308,8 @@ Important rules:
 - Added `inspect_save.py --active-summary`.
 - Changed runtime guidance so full save render/lint happens at
   checkpoints instead of every turn.
+- Added context-summary compression so long session logs stay archived
+  without becoming ordinary-turn prompt context.
 
 ### v0.5.x
 

@@ -10,9 +10,9 @@ the agent do them by hand:
 | `chunker.py` | Split a raw novel text file into chapter-sized chunks under `packs/<pack>/.ingest/chunks.jsonl`. Used by `playbooks/ingest.md`. |
 | `lint_pack.py` | Rule-based validation of a genre pack (`--genre <name>`) or user pack (`--pack <name>`): required files, schema, cross-refs, orphan wiki-links, bare slugs on non-ASCII-named entities. |
 | `lint_save.py` | Rule-based validation of a save (`--save <pack>/<save_id>`): JSON legality, `turn ≡ len(session_log)`, `player.json ≡ world_state.player`, rendered-surface drift, `hidden_truths` consistency, slug existence against the pack. |
-| `render_save.py` | Re-render every markdown surface of a save (`current_scene.md`, `player.md`, `session_log.md`, `hidden_truths.md`) from the canonical JSON state. Run at checkpoints after JSON writes. |
+| `render_save.py` | Re-render every markdown surface of a save (`current_scene.md`, `player.md`, recent-window `session_log.md`, `hidden_truths.md`) from the canonical JSON state. Full `session_log.jsonl` remains the archive. |
 | `render_pack.py` | Expand the pack's `[[slug\|Display]]` wiki-links into plain Markdown links under `packs/<pack>/_rendered/` so the pack reads in any Markdown viewer. Canonical pages are left untouched. |
-| `inspect_save.py` | One-screen plain-text summary of a save's state. `--active-summary` prints the compact checkpoint seed for ordinary-turn play. Read-only. |
+| `inspect_save.py` | One-screen plain-text summary of a save's state. `--active-summary` prints context summary + recent turns + compact checkpoint seed. Read-only. |
 
 Saves live at `saves/<pack>/<save_id>/`, so the canonical `--save`
 argument is `<pack>/<save_id>` (e.g. `mypack/save_001`). The `--save`

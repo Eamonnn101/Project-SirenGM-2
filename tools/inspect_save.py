@@ -13,9 +13,9 @@ narration preview, and divergence count. Output is plain text, one
 save per invocation.
 
 With `--active-summary`, prints a smaller checkpoint seed for the
-agent's in-conversation active state. No pending buffer is read from
-disk; pending deltas live only in the current conversation until a
-checkpoint persists them.
+agent's in-conversation active state. It includes the save's compressed
+context summary and only the recent session-log window; the full
+session-log archive is not loaded for ordinary-turn context.
 """
 
 from __future__ import annotations
@@ -27,10 +27,22 @@ from pathlib import Path
 if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from _hud import hud_labels, render_compact_turn_hud, render_full_build_hud
-    from render_save import _read_pack_language, load_meta_progress, load_save
+    from render_save import (
+        CONTEXT_SUMMARY_FILENAME,
+        RECENT_SESSION_LOG_LIMIT,
+        _read_pack_language,
+        load_meta_progress,
+        load_save,
+    )
 else:
     from ._hud import hud_labels, render_compact_turn_hud, render_full_build_hud
-    from .render_save import _read_pack_language, load_meta_progress, load_save
+    from .render_save import (
+        CONTEXT_SUMMARY_FILENAME,
+        RECENT_SESSION_LOG_LIMIT,
+        _read_pack_language,
+        load_meta_progress,
+        load_save,
+    )
 
 
 def format_summary(save, *, save_dir: Path | None = None, language: str | None = None) -> str:
@@ -114,11 +126,32 @@ def _join_or_none(values: list[str]) -> str:
     return "; ".join(values) if values else "none"
 
 
-def format_active_summary(save, *, language: str | None = None) -> str:
+def _read_context_summary(save_dir: Path | None) -> str:
+    if save_dir is None:
+        return "(not loaded)"
+    path = save_dir / CONTEXT_SUMMARY_FILENAME
+    if not path.is_file():
+        return "(missing; create or update at the next checkpoint)"
+    text = path.read_text(encoding="utf-8").strip()
+    return text if text else "(empty; update at the next checkpoint)"
+
+
+def _format_recent_turns(session_log) -> str:
+    if not session_log:
+        return "none"
+    parts: list[str] = []
+    for entry in session_log[-RECENT_SESSION_LOG_LIMIT:]:
+        summary = entry.summary.strip() or entry.narration.strip().splitlines()[0]
+        player_input = entry.player_input.strip()
+        parts.append(f"turn {entry.turn}: {summary} (player: {player_input})")
+    return "\n".join(f"- {part}" for part in parts)
+
+
+def format_active_summary(save, *, save_dir: Path | None = None, language: str | None = None) -> str:
     """Compact checkpoint seed for ordinary-turn play.
 
     `effective_turn` and `last_checkpoint_turn` are equal because this tool
-    reads only canonical JSON. During play, pending turn deltas are tracked
+    reads only canonical JSON. During play, private turn notes are tracked
     in conversation and folded into the next checkpoint.
     """
     w = save.world
@@ -156,6 +189,10 @@ def format_active_summary(save, *, language: str | None = None) -> str:
         "objectives: " + _join_or_none(w.current_objectives),
         "open_loops: "
         + _join_or_none([f"{loop.id} - {loop.title}" for loop in open_items]),
+        "context_summary:",
+        _read_context_summary(save_dir),
+        f"recent_turns (last {RECENT_SESSION_LOG_LIMIT}):",
+        _format_recent_turns(save.session_log),
     ]
     return "\n".join(lines) + "\n"
 
@@ -175,11 +212,13 @@ def main(argv: list[str] | None = None) -> int:
     if not save_dir.is_dir():
         print(f"error: save dir not found: {save_dir}", file=sys.stderr)
         return 2
+    if args.active_summary:
+        save = load_save(save_dir, session_log_limit=RECENT_SESSION_LOG_LIMIT)
+        language = _read_pack_language(args.packs_root, save.pack_name)
+        sys.stdout.write(format_active_summary(save, save_dir=save_dir, language=language))
+        return 0
     save = load_save(save_dir)
     language = _read_pack_language(args.packs_root, save.pack_name)
-    if args.active_summary:
-        sys.stdout.write(format_active_summary(save, language=language))
-        return 0
     sys.stdout.write(format_summary(save, save_dir=save_dir, language=language))
     return 0
 

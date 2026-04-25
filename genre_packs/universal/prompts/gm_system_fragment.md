@@ -434,9 +434,10 @@ When sources disagree, follow this order:
    `packs/<name>/canon_guardrails.md` — inviolable for this novel.
 3. **Universal `style_guide.md` + `canon_guardrails.md`** — the
    default backdrop.
-4. **Recent session continuity** — the last few turns of
-   `session_log.jsonl`, for tone and short-term memory only. Never
-   read `session_log.md` or any other rendered markdown as state.
+4. **Recent session continuity** — `context_summary.md` plus the last 3
+   turns of `session_log.jsonl`, for tone and short-term memory only.
+   Never read the full `session_log.jsonl`, `session_log.md`, or any
+   other rendered markdown as state.
 
 ## Player agency (load-bearing)
 

@@ -32,6 +32,9 @@ Use three layers during play:
 
 - **Checkpoint state** — canonical files under
   `saves/<pack>/<save_id>/`. JSON wins over prose whenever they differ.
+- **Context Summary** — `context_summary.md`, a compact memory of the
+  run so far. It is the long-run narrative context; full session logs are
+  archive only.
 - **Active State Summary** — compact in-conversation snapshot seeded
   by `python tools/inspect_save.py --save <pack>/<save_id>
   --active-summary` when play starts/resumes or after each checkpoint.
@@ -100,7 +103,8 @@ that turn. If unsure whether an event is "major", checkpoint.
 Load enough canonical context to seed the active summary:
 
 1. `world_state.json`, `relationship_state.json`, `open_loops.json`,
-   `meta.json`, and the last 6 entries of `session_log.jsonl`.
+   `meta.json`, `context_summary.md` if present, and the last 3 entries
+   of `session_log.jsonl`.
 2. `packs/<pack>/index.md` for `language`.
 3. `packs/<pack>/novel_rules.md` and `packs/<pack>/progression_rules.md`
    as compact reference for hard novel rules, stages, artifacts,
@@ -119,7 +123,12 @@ python tools/inspect_save.py --save <pack>/<save_id> --active-summary
 ```
 
 Copy the resulting active-state summary into the conversation. This
-summary is the default context for ordinary turns.
+summary includes the compact context summary and recent turn summaries;
+it is the default context for ordinary turns.
+
+Never read the full `session_log.jsonl` or `session_log.md` for ordinary
+play context. `session_log.jsonl` is the complete archive, not the
+prompt context. `session_log.md` is a recent-window display surface.
 
 ### Ordinary Turn
 
@@ -198,14 +207,21 @@ the agent judges that accumulated private notes should become durable.
    - `player.json` mirrored from `world_state.player`;
    - one `session_log.jsonl` entry per noted turn;
    - `meta.json::hidden_truths` and `divergences.jsonl` as needed.
-6. After that, render/lint only once after every noted turn has been applied:
+6. Update `context_summary.md` when the log is large enough to matter:
+   if `session_log.jsonl` is over 20 KB, or the run has reached 20+
+   turns, rewrite the summary before rendering. Keep it around 1200–1800
+   zh characters or 900 en words. It should cover compressed plot
+   memory, important facts, NPC/relationship changes, unresolved hooks,
+   promises/deadlines, current location, and near-term intent. If an old
+   save has no `context_summary.md`, create it at the next checkpoint.
+7. After that, render/lint only once after every noted turn has been applied:
 
    ```bash
    python tools/render_save.py --save <pack>/<save_id>
    python tools/lint_save.py --save <pack>/<save_id>
    ```
 
-7. If lint exits 1, fix before replying. If lint exits 0, refresh the
+8. If lint exits 1, fix before replying. If lint exits 0, refresh the
    active summary with `inspect_save.py --active-summary`, clear the
    private notes, and reply to the user.
 
@@ -281,3 +297,7 @@ every ordinary turn.
 - If the active summary and canonical files disagree at resume, canonical
   JSON wins. Rebuild the active summary from disk and discard stale
   private notes.
+- If `context_summary.md` is missing on a long-running save, do not read
+  the full session log into the prompt to compensate. Use the canonical
+  state plus recent 3 turns, then create the summary at the next
+  checkpoint.

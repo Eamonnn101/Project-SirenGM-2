@@ -12,7 +12,8 @@ Reads the authoritative JSON files under the save dir
 `meta.json`, `session_log.jsonl`, `divergences.jsonl`) and overwrites
 the markdown surfaces (`current_scene.md`, `player.md`,
 `session_log.md`, `hidden_truths.md`) plus `session_log.jsonl`
-re-normalized.
+re-normalized. `session_log.md` intentionally renders only a recent
+window; `session_log.jsonl` remains the complete archive.
 
 Labels in the rendered surfaces are picked from a per-language dictionary
 keyed by the pack's declared `language` (from `packs/<pack>/index.md`).
@@ -27,6 +28,7 @@ from __future__ import annotations
 import argparse
 import json
 import sys
+from collections import deque
 from pathlib import Path
 
 import frontmatter
@@ -68,6 +70,11 @@ else:
 # Localized labels. Only 'zh' and 'en' are supported; 'zh' is the default.
 # ---------------------------------------------------------------------------
 
+CONTEXT_SUMMARY_FILENAME = "context_summary.md"
+RECENT_SESSION_LOG_LIMIT = 3
+CONTEXT_SUMMARY_UPDATE_BYTES = 20_000
+CONTEXT_SUMMARY_UPDATE_TURNS = 20
+
 LABELS: dict[str, dict[str, str]] = {
     "zh": {
         "current_scene": "当前场景",
@@ -86,6 +93,9 @@ LABELS: dict[str, dict[str, str]] = {
         "player_titles": "称号",
         "player_inventory": "物品",
         "session_log": "本局日志",
+        "session_log_recent_note": (
+            "仅显示最近 {limit} 回合；完整归档保留在 `session_log.jsonl`。"
+        ),
         "turn_label": "回合",
         "player_input": "玩家",
         "options": "选项",
@@ -122,6 +132,9 @@ LABELS: dict[str, dict[str, str]] = {
         "player_titles": "Titles",
         "player_inventory": "Inventory",
         "session_log": "Session Log",
+        "session_log_recent_note": (
+            "Showing the most recent {limit} turns only; full archive remains in `session_log.jsonl`."
+        ),
         "turn_label": "turn",
         "player_input": "Player",
         "options": "Options",
@@ -169,17 +182,21 @@ def _read_json(path: Path) -> dict:
     return json.loads(path.read_text(encoding="utf-8"))
 
 
-def _read_jsonl(path: Path) -> list[dict]:
+def _read_jsonl(path: Path, *, limit: int | None = None) -> list[dict]:
     if not path.is_file():
         return []
-    return [
-        json.loads(line)
-        for line in path.read_text(encoding="utf-8").splitlines()
-        if line.strip()
-    ]
+    if limit is not None and limit <= 0:
+        return []
+    rows: list[dict] | deque[dict]
+    rows = [] if limit is None else deque(maxlen=limit)
+    with path.open("r", encoding="utf-8") as f:
+        for line in f:
+            if line.strip():
+                rows.append(json.loads(line))
+    return list(rows)
 
 
-def load_save(save_dir: Path) -> Save:
+def load_save(save_dir: Path, *, session_log_limit: int | None = None) -> Save:
     meta = _read_json(save_dir / "meta.json")
     world = WorldState(**_read_json(save_dir / "world_state.json"))
     relationships = (
@@ -193,7 +210,8 @@ def load_save(save_dir: Path) -> Save:
         else OpenLoops()
     )
     session_log = [
-        SessionLogEntry(**row) for row in _read_jsonl(save_dir / "session_log.jsonl")
+        SessionLogEntry(**row)
+        for row in _read_jsonl(save_dir / "session_log.jsonl", limit=session_log_limit)
     ]
     divergences = [
         DivergenceNote(**row) for row in _read_jsonl(save_dir / "divergences.jsonl")
@@ -356,14 +374,29 @@ def render_player_md(
     return "\n".join(fm_lines) + "\n```\n" + body + "\n```\n"
 
 
-def render_session_log(save: Save, L: dict[str, str]) -> tuple[str, str]:
+def render_session_log(
+    save: Save,
+    L: dict[str, str],
+    *,
+    recent_limit: int = RECENT_SESSION_LOG_LIMIT,
+) -> tuple[str, str]:
     """Return (markdown, jsonl) for the session log.
 
-    The jsonl is the canonical re-loadable form; the markdown is human-readable.
+    The jsonl is the canonical full archive; the markdown is a compact
+    human-readable recent window so agents do not accidentally ingest a
+    long run's entire history.
     """
     md_lines = [f"# {L['session_log']}", ""]
+    visible_entries = save.session_log[-recent_limit:] if recent_limit else save.session_log
+    if recent_limit and len(save.session_log) > recent_limit:
+        md_lines.append(
+            "> _"
+            + L["session_log_recent_note"].format(limit=recent_limit)
+            + "_"
+        )
+        md_lines.append("")
     jsonl_lines: list[str] = []
-    for entry in save.session_log:
+    for entry in visible_entries:
         md_lines.append(f"## {L['turn_label']} {entry.turn} · {entry.at.isoformat(timespec='seconds')}")
         md_lines.append("")
         md_lines.append(f"**{L['player_input']}**: " + entry.player_input.strip())
@@ -379,6 +412,7 @@ def render_session_log(save: Save, L: dict[str, str]) -> tuple[str, str]:
             md_lines.append("")
             md_lines.append(f"> _{entry.summary}_")
         md_lines.append("")
+    for entry in save.session_log:
         jsonl_lines.append(_entry_to_json(entry))
     return (
         "\n".join(md_lines).rstrip() + "\n",
