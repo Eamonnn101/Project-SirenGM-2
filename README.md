@@ -19,6 +19,16 @@ There is no app server, daemon, web UI, or custom game CLI. Claude Code
 or Codex is the runtime; the repo supplies prompts, playbooks, schemas,
 and deterministic helper tools.
 
+## Inspiration
+
+SirenGM 2 is inspired by Andrej Karpathy's
+[`LLM Wiki`](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f)
+pattern: an LLM incrementally compiles raw source material into a
+persistent, structured middle layer instead of re-deriving everything
+from raw text on every interaction. SirenGM adapts that idea from
+personal knowledge bases to playable fiction: raw novel -> generated
+story pack -> checkpointed game state.
+
 ## Current Version
 
 **v0.6.0 - Core Play Kernel + checkpoint runtime**
