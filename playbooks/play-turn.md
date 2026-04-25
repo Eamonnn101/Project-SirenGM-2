@@ -78,6 +78,67 @@ has two parts:
    (`选项D/Option D`). See `prompts/gm_system_fragment.md` for the
    required template and rules.
 
+### Step 1a · Pre-options build scan (load-bearing)
+
+**Before** drafting A/B/C, decide whether this turn warrants a
+labeled special option. Default answer is **no** — most turns
+emit zero labeled options.
+
+1. Read `world_state.player.artifact` (name, archetype, `used`),
+   `world_state.player.innate_traits` (3 archetypes), and
+   `world_state.player.destiny_traits` (filter out
+   `exhausted: true`).
+2. Read the situation: `current_conflict` (live or null;
+   endgame?), `health_state`, `risk_level`, `present_entities`,
+   `active_threads`. The compact HUD's `Triggerable` row is a
+   hint about which hooks are primed; it is **not** a mandate
+   to surface a labeled option.
+3. **Is this turn a key beat?** A turn qualifies only when one
+   or more of:
+   - the conflict frame opens, escalates with a real
+     `paid_add` and momentum shift, or enters endgame
+     (`beats_remaining(turn) <= 1`);
+   - `health_state` ∈ {`badly_hurt`, `critical`} and the turn's
+     prose centers on the danger;
+   - `risk_level == "lethal"`;
+   - the player is making a major branching decision with
+     lasting consequence (back X or Y, reveal or conceal, where
+     to commit);
+   - investigation breakthrough — a key piece of information
+     lands and changes how the player should act;
+   - significant social pivot — an NPC's stance is about to
+     flip (alliance, betrayal, first-trust, breaking point).
+
+   Quiet exposition, recap, planning, travel, shopping, small
+   talk, and mid-investigation "thinking it through" turns are
+   **not** key beats, even when `risk_level == "tense"` or a
+   conflict frame is technically active. The full list and
+   negative cases are in `prompts/gm_system_fragment.md`
+   § *Key beats*.
+
+4. If the turn is **not** a key beat, emit **zero** labeled
+   options and skip the rest of this step.
+
+5. If it *is* a key beat, ask which single item on the player
+   opens the most distinct approach for *this specific pivot*:
+   the artifact (when its mechanic seed fires here), one of the
+   three innate traits (when its archetype genuinely applies),
+   or one unexhausted destiny trait (when its mechanic seed is
+   primed). Pick the **strongest one**; leave the others
+   unlabeled.
+
+6. Emit **at most one labeled option per turn, total** — across
+   artifact, innate, and destiny combined. The labeled option
+   replaces one of A/B/C; it does not add a fifth slot. The
+   fixed D free-form slot is unaffected.
+
+Picking a labeled option does not consume the artifact or exhaust
+the trait. Survival-trigger firings (`bond_rescue` `used: true`,
+destiny `exhausted: true`) and ledger costs still go through the
+normal patch keys. Full label format and rules are in
+`prompts/gm_system_fragment.md` § *Pre-options scan*,
+§ *Key beats*, and § *Labeled special options*.
+
 Persist the narration and the four option strings separately in
 Step 3; `session_log.jsonl` keeps `narration` (prose only) and
 `options` (list of 4 full strings A/B/C/D) as distinct fields.
@@ -351,26 +412,58 @@ talking to the user.
 
 ## Step 5 · Respond to the user
 
-Output to the user exactly what Step 1 produced. The exact shape
-depends on whether a conflict frame is active after this turn's
-patch has been applied:
+Output to the user exactly what Step 1 produced, with the compact
+HUD line at the top. Step 4's `render_save.py` call has already
+written the canonical compact HUD into
+`saves/<pack>/<save_id>/current_scene.md` as a single bare line
+between the frontmatter and the `# 当前场景 / # Current Scene`
+heading — the chat reply **reproduces that exact line** verbatim.
 
-- **No conflict frame (default)** — prose narration, one blank
-  line, the four option strings (A/B/C/D). Nothing else.
-- **Conflict frame is active** — a single-line conflict HUD (format
-  per `genre_packs/universal/prompts/gm_system_fragment.md` §
+The shape depends on whether a conflict frame is active after
+this turn's patch has been applied:
+
+- **No conflict frame (default)** — compact HUD line, one blank
+  line, the prose narration, one blank line, the four option
+  strings (A/B/C/D). Nothing else.
+- **Conflict frame is active** — compact HUD line, one blank
+  line, a single-line conflict HUD (format per
+  `genre_packs/universal/prompts/gm_system_fragment.md` §
   *Conflict HUD line*), one blank line, the prose narration, one
-  blank line, the four option strings. The HUD line is the only
-  meta the player sees; it is required on every conflict turn and
-  must never be abbreviated or folded into the prose.
+  blank line, the four option strings. Both HUD elements are
+  required and must never be abbreviated or folded into the
+  prose.
+- **Breakthrough or death turn** — compact HUD line, one blank
+  line, the short narration coda, one blank line, the
+  Unicode-boxed pick / Run-end block (per
+  `prompts/breakthrough_pick.md` or `prompts/death_coda.md`).
+  The breakthrough/death blocks **replace** A/B/C/D for that
+  turn; the compact HUD line at the top is still required.
+
+To produce the compact HUD line in the chat reply, copy the
+single bare line from `current_scene.md` (the line immediately
+after the closing `---` of the frontmatter, before the
+`# 当前场景 / # Current Scene` heading). Format example:
+
+```
+第 12 回 / 〔悟性过人〕〔以诚动人〕〔奇缘不断〕 / 〔法宝・观机古镜〕 / 〔体况・健康〕
+```
+
+Do not wrap it in a code block, do not bold or italicize it, do
+not reorder or rename segments. The text is authoritative and
+matches `_hud.py :: render_compact_turn_hud` for the post-patch
+state. Do not invent a more verbose form on conflict turns or
+when health is critical — the segment list (turn / innate /
+artifact / health / optional destiny / optional triggerable) is
+the full vocabulary.
 
 The JSON writes and `render_save.py` call happen **before** the
-reply, so the HUD reads the updated `current_conflict` (the one
-this turn just wrote, including any `conflict_open`,
-`conflict_update`, or `conflict_resolve`). If this turn resolved
-the frame, there is no HUD line next turn — but the player still
-sees the "上一场冲突 / Last Conflict" block in
-`current_scene.md` on request until the next conflict opens.
+reply, so both HUD elements read the updated `current_conflict`
+and `player` state (including any `conflict_open`,
+`conflict_update`, `conflict_resolve`, or progression patches
+this turn just wrote). If this turn resolved the frame, there is
+no conflict HUD line next turn — but the player still sees the
+"上一场冲突 / Last Conflict" block in `current_scene.md` on
+request until the next conflict opens.
 
 On request, the user can run
 `python tools/inspect_save.py --save <pack>/<save_id>` to inspect.

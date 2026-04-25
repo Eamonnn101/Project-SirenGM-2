@@ -107,6 +107,40 @@ effect described in the novel's own vocabulary.
   firing (engine uses `player_trait_exhaust` patch key).
 - No two destiny traits share an archetype key within a run.
 
+## Labeled destiny options (load-bearing)
+
+Like artifacts and innate traits, the GM surfaces an unexhausted
+destiny trait via a **labeled special option** when its mechanic
+seed is *primed* and the turn is a **key beat** (see
+`gm_system_fragment.md` § *Key beats*). Default cadence is
+**zero per turn**. Format:
+
+- `zh`: `选项A〔命格・<destiny_name>〕（…）：…`
+- `en`: `Option A [Destiny · <destiny_name>] (…): …`
+
+Per-family priming shapes (also drives the HUD's `Triggerable`
+row):
+
+| family       | primed when                                                              |
+| ------------ | ------------------------------------------------------------------------ |
+| Survival     | `health_state` ∈ {`badly_hurt`, `critical`} OR conflict in endgame       |
+| Insight      | conflict frame active AND at a pivot beat (open / escalation / endgame)  |
+| Desperation  | `health_state` ∈ {`badly_hurt`, `critical`}                              |
+| Companion    | conflict frame active at a pivot beat AND a fitting NPC / asset is present |
+
+Even when primed, the labeled option appears only if this turn
+is a true pivot. Across artifact + innate + destiny combined,
+**at most one labeled option appears per turn** — pick the
+strongest match.
+
+Picking a labeled destiny option does not on its own exhaust the
+trait. Survival-trigger firings flip `exhausted: true` via the
+explicit `player_trait_exhaust` patch (see *Survival-trigger
+precedence* in `gm_system_fragment.md`); other once-per-run
+destinies require an explicit narrative-cost patch when they
+fire. Repeatable destinies (e.g., `heaven_piercing_eye`,
+`learn_from_enemy`, `read_the_room`) never set `exhausted: true`.
+
 ## What destiny traits are NOT
 
 - Not flat +%. A `read_the_room` trait is a reveal mechanic, not a

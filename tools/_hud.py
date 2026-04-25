@@ -16,7 +16,6 @@ labels line up in both Chinese and Latin monospace fonts.
 from __future__ import annotations
 
 import unicodedata
-from typing import Iterable
 
 if __package__ is None or __package__ == "":
     from _models import (  # type: ignore[no-redef]
@@ -68,9 +67,7 @@ def pad_right(s: str, width: int) -> str:
 HUD_LABELS: dict[str, dict[str, str]] = {
     "zh": {
         # Block headers / special lines
-        "compact_header": "状态",
         "compact_turn": "第 {turn} 回",
-        "compact_time_sep": " · ",
         "build_header": "角色小传",
         "build_artifact_header": "法宝",
         "build_innate_header": "天赋",
@@ -80,15 +77,16 @@ HUD_LABELS: dict[str, dict[str, str]] = {
         "meta_artifact_coverage": "法宝",
         "meta_innate_coverage": "天赋",
         "meta_destiny_coverage": "命格",
-        # Field labels
+        # Field labels (used by the Layer B build HUD inside player.md)
         "hud_stage": "境界",
         "hud_health": "体况",
-        "hud_artifact": "法宝",
-        "hud_innate": "天赋",
-        "hud_destiny": "命格",
-        "hud_conflict": "对局",
-        "hud_goals": "主目标",
-        "hud_threads": "悬念",
+        # Compact single-line HUD prefixes
+        "compact_artifact_prefix": "法宝",
+        "compact_health_prefix": "体况",
+        "compact_destiny_prefix": "命格",
+        "compact_triggerable_prefix": "可发动",
+        "compact_used_marker": " · 已用",
+        "compact_section_sep": " / ",
         "build_slug": "标识",
         "build_archetype": "类属",
         "build_activation": "效用",
@@ -109,18 +107,12 @@ HUD_LABELS: dict[str, dict[str, str]] = {
         "meta_best_stage": "最高境界",
         "meta_recent_deaths": "近期陨落",
         # Warning / marker glyphs
-        "risk_warn_calm": "",
-        "risk_warn_tense": " · ⚠",
-        "risk_warn_dangerous": " · ⚠⚠",
-        "risk_warn_lethal": " · ☠",
         "health_warn_healthy": "",
         "health_warn_hurt": "",
         "health_warn_badly_hurt": " · ⚠",
         "health_warn_critical": " · ⚠⚠",
         "health_warn_dead": " · ☠",
-        "used_marker": " · 已用",
         "exhausted_mark": "*",
-        "destiny_sep": "、",
         "innate_sep": " · ",
         "dash": "—",
         "stage_fmt": "〔第 {index}/{max} 境〕",
@@ -153,22 +145,14 @@ HUD_LABELS: dict[str, dict[str, str]] = {
         "destiny_little_shadow": "小影",
         "destiny_timely_ally": "及时援",
         "destiny_read_the_room": "观势",
-        # Conflict HUD row helpers (reuses existing momentum labels)
+        # Conflict-block label (used by render_save's "Last Conflict" block)
         "conflict_momentum_endgame": "收束在即",
-        "momentum_setup": "开局",
-        "momentum_player_pressing": "你方紧逼",
-        "momentum_even": "僵持",
-        "momentum_opposition_pressing": "对立方紧逼",
-        "momentum_reversal_imminent": "逆转在即",
-        "conflict_row_sep": " │ ",
         "stage_unset": "（未定）",
         "artifact_unset": "（未择）",
         "death_entry_fmt": "第 {turn} 回 · 落于 {cause} · {stage}",
     },
     "en": {
-        "compact_header": "State",
         "compact_turn": "Turn {turn}",
-        "compact_time_sep": " · ",
         "build_header": "Character",
         "build_artifact_header": "Artifact",
         "build_innate_header": "Innate",
@@ -178,14 +162,16 @@ HUD_LABELS: dict[str, dict[str, str]] = {
         "meta_artifact_coverage": "Artifacts",
         "meta_innate_coverage": "Innate",
         "meta_destiny_coverage": "Destiny",
+        # Field labels (used by the Layer B build HUD inside player.md)
         "hud_stage": "Stage",
         "hud_health": "Health",
-        "hud_artifact": "Artifact",
-        "hud_innate": "Innate",
-        "hud_destiny": "Destiny",
-        "hud_conflict": "Conflict",
-        "hud_goals": "Goals",
-        "hud_threads": "Threads",
+        # Compact single-line HUD prefixes
+        "compact_artifact_prefix": "Artifact",
+        "compact_health_prefix": "Health",
+        "compact_destiny_prefix": "Destiny",
+        "compact_triggerable_prefix": "Triggerable",
+        "compact_used_marker": " · used",
+        "compact_section_sep": " / ",
         "build_slug": "Slug",
         "build_archetype": "Archetype",
         "build_activation": "Effect",
@@ -204,18 +190,12 @@ HUD_LABELS: dict[str, dict[str, str]] = {
         "meta_deaths_count": "Deaths",
         "meta_best_stage": "Best stage",
         "meta_recent_deaths": "Recent deaths",
-        "risk_warn_calm": "",
-        "risk_warn_tense": " · !",
-        "risk_warn_dangerous": " · !!",
-        "risk_warn_lethal": " · X",
         "health_warn_healthy": "",
         "health_warn_hurt": "",
         "health_warn_badly_hurt": " · !",
         "health_warn_critical": " · !!",
         "health_warn_dead": " · X",
-        "used_marker": " · used",
         "exhausted_mark": "*",
-        "destiny_sep": ", ",
         "innate_sep": " · ",
         "dash": "—",
         "stage_fmt": " [Stage {index}/{max}]",
@@ -245,12 +225,6 @@ HUD_LABELS: dict[str, dict[str, str]] = {
         "destiny_timely_ally": "Timely Ally",
         "destiny_read_the_room": "Read the Room",
         "conflict_momentum_endgame": "Endgame",
-        "momentum_setup": "Setup",
-        "momentum_player_pressing": "You pressing",
-        "momentum_even": "Even",
-        "momentum_opposition_pressing": "Opposition pressing",
-        "momentum_reversal_imminent": "Reversal imminent",
-        "conflict_row_sep": " | ",
         "stage_unset": "(unset)",
         "artifact_unset": "(unchosen)",
         "death_entry_fmt": "Turn {turn} · fell to {cause} · {stage}",
@@ -292,104 +266,214 @@ def _rule(header: str, width: int = 46) -> str:
 
 
 # ---------------------------------------------------------------------------
-# Layer A · Compact turn HUD
+# Layer A · Compact turn HUD — single-line bracket format.
+# Triggerable hooks below are surfaced as a final segment when the situation
+# is salient. Conservative heuristic: a *hint* to the GM and a player-visible
+# cue, not a deterministic enumeration. The GM applies narrative judgment when
+# picking which labeled options to actually expose this turn.
 # ---------------------------------------------------------------------------
 
 
-def _format_label_value_rows(
-    items: Iterable[tuple[str, str]],
-) -> list[str]:
-    """Format (label, value) pairs into `<label>  │  <value>` strings with
-    a shared label-column width."""
-    pairs = list(items)
-    if not pairs:
-        return []
-    label_w = max(visual_width(lbl) for lbl, _ in pairs)
-    return [f"{pad_right(lbl, label_w)}  │  {val}" for lbl, val in pairs]
+_DESTINY_FAMILY: dict[str, str] = {
+    "not_meant_to_die": "survival",
+    "golden_cicada_escape": "survival",
+    "last_barrier": "survival",
+    "heaven_piercing_eye": "insight",
+    "learn_from_enemy": "insight",
+    "breakthrough_instinct": "insight",
+    "martial_remnant_resolve": "desperation",
+    "last_stand": "desperation",
+    "blood_debt": "desperation",
+    "little_shadow": "companion",
+    "timely_ally": "companion",
+    "read_the_room": "companion",
+}
 
 
-def _artifact_row_value(save: Save, L: dict[str, str]) -> str:
-    art = save.world.player.artifact
-    if art is None:
-        return L["artifact_unset"]
-    archetype = L.get(f"artifact_{art.archetype}", art.archetype)
-    used = L["used_marker"] if art.used else ""
-    return f"{art.name}〔{archetype}〕{used}"
-
-
-def _innate_row_value(save: Save, L: dict[str, str]) -> str:
-    traits = save.world.player.innate_traits
-    if not traits:
-        return L["dash"]
-    return L["innate_sep"].join(t.name for t in traits)
-
-
-def _destiny_row_value(save: Save, L: dict[str, str]) -> str:
-    traits = save.world.player.destiny_traits
-    if not traits:
-        return L["dash"]
-    parts = []
-    for t in traits:
-        mark = L["exhausted_mark"] if t.exhausted else ""
-        parts.append(f"{t.name}{mark}")
-    return L["destiny_sep"].join(parts)
-
-
-def _conflict_row_value(save: Save, L: dict[str, str]) -> str:
+def _is_pivot_conflict(save: Save) -> bool:
+    """True when the active conflict frame is at a pivot beat (open / endgame /
+    reversal). Returns False when no frame is active or the frame is in
+    standard mid-conflict pacing."""
     w = save.world
     c = w.current_conflict
     if c is None:
-        return L["dash"]
+        return False
     if c.is_endgame(w.turn):
-        momentum = L["conflict_momentum_endgame"]
-    else:
-        momentum = L.get(f"momentum_{c.momentum}", c.momentum)
-    return L["conflict_row_sep"].join([c.kind, momentum, c.stake])
+        return True
+    if c.opened_turn == w.turn:
+        return True
+    if c.momentum == "reversal_imminent":
+        return True
+    return False
 
 
-def _goals_row_value(save: Save, L: dict[str, str]) -> str:
-    objs = save.world.current_objectives
-    return "; ".join(objs) if objs else L["dash"]
+def _is_salient(save: Save) -> bool:
+    """True when at least one structured signal says a build hook may fire.
+
+    Tightened (2026-04-25): the floor is now `conflict pivot OR critical-tier
+    health OR lethal risk`. Generic `tense` risk or a quiet mid-conflict
+    pacing turn no longer qualifies — that drove the `Triggerable` row
+    every turn during exploratory scenes.
+    """
+    w = save.world
+    return (
+        _is_pivot_conflict(save)
+        or w.player.health_state in ("badly_hurt", "critical")
+        or w.risk_level == "lethal"
+    )
 
 
-def _threads_row_value(save: Save, L: dict[str, str]) -> str:
-    threads = save.world.active_threads
-    return "; ".join(t.title for t in threads) if threads else L["dash"]
+def _triggerable_artifact_name(save: Save) -> str | None:
+    art = save.world.player.artifact
+    if art is None or art.used:
+        return None
+    w = save.world
+    p = w.player
+    pivot = _is_pivot_conflict(save)
+    health_pressed = p.health_state in ("badly_hurt", "critical")
+    if art.archetype == "insight":
+        return art.name if pivot else None
+    if art.archetype == "bond_rescue":
+        return art.name if health_pressed else None
+    if art.archetype == "companion":
+        if pivot or w.risk_level == "lethal":
+            return art.name
+        return None
+    return None
+
+
+def _triggerable_innate_labels(save: Save, L: dict[str, str]) -> list[str]:
+    w = save.world
+    p = w.player
+    pivot = _is_pivot_conflict(save)
+    health_pressed = p.health_state in ("badly_hurt", "critical")
+    lethal = w.risk_level == "lethal"
+    has_company = bool(w.present_entities)
+    has_threads = bool(w.active_threads) or bool(w.current_objectives)
+    momentum_pressing = (
+        w.current_conflict is not None
+        and w.current_conflict.momentum
+        in ("reversal_imminent", "player_pressing", "opposition_pressing")
+    )
+    endgame = w.current_conflict is not None and w.current_conflict.is_endgame(w.turn)
+
+    out: list[str] = []
+    for t in p.innate_traits:
+        a = t.archetype
+        eligible = False
+        if a == "talent":
+            eligible = pivot
+        elif a == "survival":
+            eligible = health_pressed or lethal
+        elif a == "social":
+            eligible = pivot and has_company
+        elif a == "resource":
+            eligible = pivot and has_threads
+        elif a == "temperament":
+            eligible = endgame or momentum_pressing
+        if eligible:
+            out.append(L.get(f"innate_{a}", a))
+    return out
+
+
+def _triggerable_destiny_names(save: Save) -> list[str]:
+    w = save.world
+    p = w.player
+    pivot = _is_pivot_conflict(save)
+    endgame = w.current_conflict is not None and w.current_conflict.is_endgame(w.turn)
+    health_pressed = p.health_state in ("badly_hurt", "critical")
+    has_company = bool(w.present_entities)
+
+    out: list[str] = []
+    for t in p.destiny_traits:
+        if t.exhausted:
+            continue
+        family = _DESTINY_FAMILY.get(t.archetype)
+        eligible = False
+        if family == "survival":
+            eligible = health_pressed or endgame
+        elif family == "insight":
+            eligible = pivot
+        elif family == "desperation":
+            eligible = health_pressed
+        elif family == "companion":
+            eligible = pivot and has_company
+        if eligible:
+            out.append(t.name)
+    return out
+
+
+def _triggerable_row_value(save: Save, L: dict[str, str]) -> str | None:
+    """Return the Triggerable row value, or None when nothing is in play."""
+    if not _is_salient(save):
+        return None
+    parts: list[str] = []
+    art_name = _triggerable_artifact_name(save)
+    if art_name:
+        parts.append(art_name)
+    parts.extend(_triggerable_innate_labels(save, L))
+    parts.extend(_triggerable_destiny_names(save))
+    if not parts:
+        return None
+    return L["innate_sep"].join(parts)
 
 
 def render_compact_turn_hud(save: Save, L: dict[str, str]) -> str:
-    """Layer A · compact turn HUD box. Returns a string without trailing newline."""
+    """Layer A · compact single-line turn HUD.
+
+    Format example (zh):
+        第 29 回 / 〔悟性过人〕〔以诚动人〕〔奇缘不断〕 / 〔法宝・观机古镜〕 / 〔体况・健康〕
+
+    Optional segments (destiny, triggerable hint) are appended only when
+    they would carry information. Everything else (stage, conflict, goals,
+    threads) is intentionally omitted from this line — full detail lives in
+    the Layer B build HUD inside `player.md`, and the conflict HUD line
+    (when a frame is active) is emitted separately on its own line per
+    `genre_packs/universal/prompts/gm_system_fragment.md`.
+    """
     w = save.world
     p = w.player
 
-    stage_label = p.stage_label or L["stage_unset"]
-    stage_value = stage_label + L["stage_fmt"].format(
-        index=p.stage_index, max=STAGE_INDEX_MAX
-    )
-    health_value = L.get(f"health_{p.health_state}", p.health_state) + L.get(
-        f"health_warn_{p.health_state}", ""
-    )
-    risk_warn = L.get(f"risk_warn_{w.risk_level}", "")
-    header = (
-        f"{L['compact_header']}"
-        f"{L['compact_time_sep']}"
-        f"{L['compact_turn'].format(turn=w.turn)}"
-        f"{L['compact_time_sep']}{w.time_of_day}"
-        f"{risk_warn}"
+    segments: list[str] = []
+
+    # Turn marker — e.g. "第 29 回" / "Turn 29".
+    segments.append(L["compact_turn"].format(turn=w.turn))
+
+    # Innate traits — concatenated bracketed names with no inner separator.
+    if p.innate_traits:
+        segments.append("".join(f"〔{t.name}〕" for t in p.innate_traits))
+
+    # Artifact — `〔法宝・<name>〕` with a `· 已用 / · used` suffix only when used.
+    if p.artifact is not None:
+        used_suffix = L["compact_used_marker"] if p.artifact.used else ""
+        segments.append(
+            f"〔{L['compact_artifact_prefix']}・{p.artifact.name}{used_suffix}〕"
+        )
+
+    # Health — `〔体况・<state>〕` with the warning glyph inline.
+    health_label = L.get(f"health_{p.health_state}", p.health_state)
+    health_warn = L.get(f"health_warn_{p.health_state}", "")
+    segments.append(
+        f"〔{L['compact_health_prefix']}・{health_label}{health_warn}〕"
     )
 
-    pairs: list[tuple[str, str]] = [
-        (L["hud_stage"], stage_value),
-        (L["hud_health"], health_value),
-        (L["hud_artifact"], _artifact_row_value(save, L)),
-        (L["hud_innate"], _innate_row_value(save, L)),
-        (L["hud_destiny"], _destiny_row_value(save, L)),
-        (L["hud_conflict"], _conflict_row_value(save, L)),
-        (L["hud_goals"], _goals_row_value(save, L)),
-        (L["hud_threads"], _threads_row_value(save, L)),
-    ]
-    rows = _format_label_value_rows(pairs)
-    return _box(rows, header)
+    # Destiny — `〔命格・<name>〕(·)?` per trait, only when any are present.
+    if p.destiny_traits:
+        prefix = L["compact_destiny_prefix"]
+        items = []
+        for t in p.destiny_traits:
+            mark = L["exhausted_mark"] if t.exhausted else ""
+            items.append(f"〔{prefix}・{t.name}{mark}〕")
+        segments.append("".join(items))
+
+    # Triggerable hint — only when salient and at least one hook is primed.
+    triggerable = _triggerable_row_value(save, L)
+    if triggerable is not None:
+        segments.append(
+            f"〔{L['compact_triggerable_prefix']}・{triggerable}〕"
+        )
+
+    return L["compact_section_sep"].join(segments)
 
 
 # ---------------------------------------------------------------------------

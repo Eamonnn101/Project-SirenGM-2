@@ -23,34 +23,52 @@ described below**.
 
 ## Turn output format (load-bearing)
 
-Every turn output has two or three parts, depending on whether a
+Every turn output has three or four parts, depending on whether a
 conflict frame is active.
 
-**When `world_state.current_conflict` is null (default):**
+**Common to every turn (default):**
 
+0a. **Compact turn HUD line** — a single bare line at the top of
+   the chat reply, followed by one blank line. This is the
+   player's persistent state read-out (turn, innate traits,
+   artifact, health, plus optional destiny and triggerable
+   segments). The exact text comes from `_hud.py ::
+   render_compact_turn_hud(save, hud_labels(language))` evaluated
+   **after this turn's patch is persisted** — i.e. the HUD
+   reflects the post-patch state the player is about to see. It
+   is **not optional** on any turn. Do not wrap it in a code
+   block, do not bold or italicize it; emit it bare.
 1. **Narration** — 300–700 characters of scene prose for `zh` packs
    (200–500 English words for `en`). This budget counts **only the
-   narration prose**; the options block below is excluded and has
-   its own per-line length rules. No headings, no lists, no
-   meta-commentary inside the narration itself.
+   narration prose**; the HUD lines and options block are excluded
+   and have their own per-line length rules. No headings, no
+   lists, no meta-commentary inside the narration itself.
 2. **Options block** — a bullet list of exactly four options,
    separated from the narration by one blank line.
 
-**When `world_state.current_conflict` is non-null:** prepend a
-single-line conflict HUD before the narration. The three parts are:
+**When `world_state.current_conflict` is non-null:** also insert
+a single-line conflict HUD between the compact HUD line and the
+narration. The four parts are:
 
-0. **Conflict HUD line** (exactly one line, followed by one blank
-   line). Format is fixed; see *Conflict HUD line* below. This is
-   the player's visible signal that the conflict engine is live —
-   it is not optional and must never be abbreviated or omitted on
-   a conflict turn.
+0a. **Compact turn HUD line** (as above).
+0b. **Conflict HUD line** (exactly one line, followed by one
+   blank line). Format is fixed; see *Conflict HUD line* below.
+   This is the player's visible signal that the conflict engine
+   is live — it is not optional and must never be abbreviated or
+   omitted on a conflict turn.
 1. **Narration** — same budget and rules as above.
 2. **Options block** — same as above.
 
-The HUD line and options block are **deliberate exceptions** to the
-"no bullets / no meta" rule governing narration. They are required
-in their respective conditions; they are not prose-embedded
-foreshadowing.
+The HUD lines and the options block are **deliberate exceptions**
+to the "no bullets / no meta" rule governing narration. They are
+required in their respective conditions; they are not
+prose-embedded foreshadowing.
+
+The compact HUD line must appear **above** the conflict HUD
+line. Special breakthrough / death turns (see *Breakthrough turn
+output* and *Death / completion turn output* below) replace the
+A/B/C/D options block with their respective Unicode boxes, but
+the compact HUD line at the top of the reply is still required.
 
 ### Conflict HUD line
 
@@ -234,9 +252,79 @@ narration):
   resolve on that turn. HUD remains on `收束在即 / Endgame`.
 - `remaining <= -2` — lint warns; you should have resolved.
 
+### Pre-options scan (load-bearing)
+
+**Before** drafting A/B/C, silently walk the player's build and the
+current scene to decide which (if any) labeled special options
+should appear this turn:
+
+1. Read `world_state.player.artifact`,
+   `world_state.player.innate_traits`, and
+   `world_state.player.destiny_traits`. Also read
+   `world_state.current_conflict`, `health_state`, `risk_level`,
+   `present_entities`, `active_threads`.
+2. Decide whether **this turn is a key beat** (see list below).
+   The default answer on most turns is **no** — investigation,
+   exposition, dialogue, travel, recap, planning, normal
+   mid-conflict pacing turns are not key beats. If the turn is
+   not a key beat, emit **zero** labeled options and move on.
+3. If it *is* a key beat, ask for each item on the player:
+   **does this trait/artifact open a genuinely distinct approach
+   right now?** The eligibility shapes are in
+   `genre_packs/universal/systems/innate_traits.md` and
+   `systems/artifacts.md`. Pick the strongest match.
+4. Emit **at most one labeled option per turn, total** (artifact
+   OR innate OR destiny — pick one). Two or more labeled tags on
+   a single turn is a tagging-for-the-sake-of-tagging failure;
+   drop all but the most pivotal. The labeled option replaces one
+   of A/B/C — it does not add a fifth slot. The fixed D
+   free-form slot is unaffected.
+
+The compact HUD's `Triggerable` row is a *hint* that at least one
+hook is plausibly primed; it is **not** a mandate to surface a
+labeled option. The GM uses narrative judgment to override the
+HUD's heuristic in both directions: a salient HUD hint may still
+yield zero labeled options on a non-pivot turn, and a quiet HUD
+may still warrant a labeled option on a clear pivot the
+heuristic missed.
+
+#### Key beats (the only turns that warrant a labeled option)
+
+A turn qualifies as a key beat when one or more of:
+
+- **Conflict pivot** — a `conflict_open`, a real
+  `conflict_update` with a `paid_add` and momentum shift, an
+  endgame turn (`beats_remaining(turn) <= 1`), a
+  `reversal_imminent` momentum, or a turn the player would later
+  remember as the moment the conflict tipped.
+- **Health crisis** — `health_state` ∈ {`badly_hurt`, `critical`}
+  AND the turn's narration is centered on the danger (not just
+  recovering quietly).
+- **Lethal risk** — `risk_level == "lethal"`.
+- **Breakthrough / death turn** — handled by their own special
+  blocks (`breakthrough_pick.md`, `death_coda.md`); a labeled
+  option **inside** A/B/C is suppressed on these turns because
+  A/B/C is replaced by a pick block anyway.
+- **Major branching decision** — a player choice with lasting
+  consequence: who to back, what to reveal, where to commit, who
+  to spare. Standard "what do I do next" turns do not qualify.
+- **Investigation breakthrough** — a turn where a key piece of
+  information lands and changes how the player should act.
+- **Significant social pivot** — an NPC's stance is on the verge
+  of changing (alliance / betrayal / first-trust / breaking
+  point), not routine conversation.
+
+Quiet exposition, recap, planning, travel, shopping, small talk,
+mid-investigation thinking-it-through — none of these are key
+beats, even when `risk_level` is `tense`. **Default: zero
+labeled options.** Surface one only when you can name the
+specific pivot.
+
 ### Options format
 
-Three GM-proposed options + one fixed free-form slot:
+Up to four GM-proposed options + one fixed free-form slot. The
+**total** A/B/C/D count is fixed at four; labeled options replace
+unlabeled ones rather than adding to them.
 
 - `选项A（<2–6 字中文策略标签>）：<60–150 字当下可执行的动作描写>`
 - `选项B（<标签>）：<动作描写>`
@@ -252,6 +340,60 @@ English pack (`language: en`):
 
 The D line is **fixed verbatim** for each language. A/B/C labels
 and bodies vary per turn.
+
+#### Labeled special options (artifact / trait)
+
+When the pre-options scan above identifies a relevant
+artifact or trait, replace one of A/B/C with a **labeled** option.
+Labels go in front of the tactic tag and signal a build-driven
+approach. Format per language:
+
+- `zh`: `选项A〔法宝・<artifact_name>〕（<战术标签>）：<动作描写>`
+- `zh`: `选项A〔<innate_label>〕（<战术标签>）：<动作描写>`
+- `zh`: `选项A〔命格・<destiny_name>〕（<战术标签>）：<动作描写>`
+- `en`: `Option A [Artifact · <artifact_name>] (<tag>): <description>`
+- `en`: `Option A [<innate_label>] (<tag>): <description>`
+- `en`: `Option A [Destiny · <destiny_name>] (<tag>): <description>`
+
+`<innate_label>` is the localized archetype name from the HUD
+label table — one of `才华 / 坚韧 / 人情 / 缘分 / 性情` (zh) or
+`Talent / Survival / Social / Resource / Temperament` (en).
+Destiny labels use the destiny trait's localized name, prefixed
+with `命格・ / Destiny ·` so the player can tell it apart from a
+generic tag.
+
+**Rules:**
+
+- **At most one labeled option per turn, total** — across
+  artifact, innate, and destiny. If two could plausibly fit,
+  pick the one that matches the most pivotal lever and leave
+  the other tag off. The remaining A/B/C slots stay unlabeled.
+- **Default cadence is zero per turn.** A labeled option
+  appears only on **key beats** (see the list in *Pre-options
+  scan* above). Most turns — investigation, exposition,
+  dialogue, travel, recap, planning, normal mid-conflict pacing
+  turns — emit no labeled option. If you cannot name the
+  specific pivot ("this is the turn the conflict opens", "this
+  is the turn the player is about to die", "this is the turn
+  the NPC's stance flips"), do not tag.
+- Labeled options open *special approaches*, not automatic wins.
+  They reduce risk, reveal information, create alternate routes,
+  shift the conflict's `kind`, or improve positioning — but the
+  outcome still has to play out (and the conflict ledger still
+  records costs).
+- A labeled option still counts as one of A/B/C and still must
+  satisfy the *Constraints on A/B/C* rules below (concrete,
+  diegetic, vector divergence, no fabricated entities).
+- Picking a labeled option does not consume the artifact or
+  exhaust the trait. The artifact's `bond_rescue` use and
+  destiny `exhausted` flips happen via the survival-trigger
+  flow and explicit `player_trait_exhaust` patches, not via
+  picking an option.
+- Labeled option **bodies must not repeat the artifact's full
+  description** — refer to it by name only. The compact HUD
+  already shows the artifact's archetype and ready/used status;
+  the option body should describe the *move*, not re-explain the
+  artifact.
 
 ### Constraints on A/B/C
 
@@ -367,13 +509,70 @@ reads both on every turn.
 
 ### Compact turn HUD (load-bearing display)
 
-`render_save.py` writes a compact turn HUD at the top of
-`current_scene.md` on every turn. The HUD shows stage, health,
-artifact, innate traits, destiny traits, conflict momentum, goals,
-and threads — with warning markers for `badly_hurt`/`critical`/
-`dead` and for `tense`/`dangerous`/`lethal` risk. Never narrate
-the HUD's contents verbatim inside the prose; the prose shows the
-beat, the HUD names the state.
+`render_save.py` writes a single-line compact turn HUD at the top
+of `current_scene.md` on every turn (between the frontmatter and
+the `# 当前场景 / # Current Scene` heading). The same line is
+echoed verbatim at the very top of the chat reply — see *Turn
+output format* above.
+
+**Format.** Sections joined by ` / `. Each section is wrapped in
+`〔 〕` (CJK brackets) for both zh and en packs.
+
+```
+第 N 回 / 〔innate1〕〔innate2〕〔innate3〕 / 〔法宝・<name>〕 / 〔体况・<state>〕[ / 〔命格・<d1>〕〔命格・<d2>〕…][ / 〔可发动・<list>〕]
+Turn N / 〔innate1〕〔innate2〕〔innate3〕 / 〔Artifact・<name>〕 / 〔Health・<state>〕[ / 〔Destiny・<d1>〕〔Destiny・<d2>〕…][ / 〔Triggerable・<list>〕]
+```
+
+**Sections (in order):**
+
+1. **Turn marker** — `第 N 回` (zh) / `Turn N` (en). Always present.
+2. **Innate traits** — three `〔<name>〕` brackets concatenated
+   without separator (e.g. `〔悟性过人〕〔以诚动人〕〔奇缘不断〕`).
+   Always present after new-game Step 1.6.
+3. **Artifact** — `〔法宝・<name>〕` / `〔Artifact・<name>〕`,
+   with a trailing `· 已用 / · used` segment **only when
+   `artifact.used == true`**. Ready is the default and is
+   implicit (no marker) to keep the line short. Always present
+   after new-game Step 1.5. The full activation contract from
+   `progression_rules.md` lives in `player.md` (Layer B); the
+   compact HUD never repeats it. **Never re-narrate the
+   artifact's full description inside the prose** — when the
+   player picks `[Artifact · …]`, narrate the move, not the manual.
+4. **Health** — `〔体况・<state>〕` / `〔Health・<state>〕`, with
+   the warning glyph appended for non-healthy states
+   (`· ⚠` for `badly_hurt`, `· ⚠⚠` for `critical`,
+   `· ☠` for `dead`; `· !`, `· !!`, `· X` in en). Always
+   present.
+5. **Destiny (conditional)** — `〔命格・<name>〕` /
+   `〔Destiny・<name>〕` per trait, brackets concatenated.
+   Suppressed when `destiny_traits` is empty. Exhausted destinies
+   carry a trailing `*` on the name.
+6. **Triggerable (conditional)** — `〔可发动・<list>〕` /
+   `〔Triggerable・<list>〕` where `<list>` is the
+   middot-separated names of the artifact / innate labels /
+   destiny names whose mechanic seeds are *primed* per the
+   structured salience gate. The salience gate fires only when at
+   least one of: a conflict frame is at a pivot beat (just
+   opened, in endgame, or `momentum == reversal_imminent`);
+   `health_state` ∈ {`badly_hurt`, `critical`}; or
+   `risk_level == "lethal"`. Generic `tense` risk and quiet
+   mid-conflict pacing turns do **not** trigger this segment.
+   Suppressed entirely otherwise.
+
+The Triggerable segment is a *hint* to the GM and a visible cue
+to the player — the GM still applies narrative judgment in the
+*Pre-options scan* and emits **at most one labeled option per
+turn** (and zero on most turns).
+
+What is intentionally **not** in the compact HUD: stage label,
+goals, active threads, conflict info. Stage and the full build
+detail live in the Layer B HUD inside `player.md`. Active
+conflict state has its own dedicated *Conflict HUD line* on
+conflict turns. Goals and threads belong to the GM's context,
+not the player's per-turn cue.
+
+Never narrate the HUD's contents verbatim inside the prose; the
+prose shows the beat, the HUD names the state.
 
 ### Stage advance guidance (soft)
 

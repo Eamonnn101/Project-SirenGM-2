@@ -75,10 +75,57 @@ semantics; it is not a survival trigger.
   `player_artifact_set` is rejected by the patch engine after
   `turn > 0` unless `artifact is None` (never happens in normal
   play).
-- The HUD shows the artifact's novel-themed name plus its
-  archetype label (`〔洞见〕`, `〔援护〕`, `〔随行〕` in zh or
-  `[Insight]`, `[Bond-Rescue]`, `[Companion]` in en) and, when
-  `used == true`, a `· 已用 / · used` marker.
+- The compact turn HUD shows the artifact every turn as a single
+  line: novel-themed name + archetype label + ready/used status
+  (`<name>〔<archetype> · 待用/已用〕` in zh,
+  `<name>〔<archetype> · Ready/used〕` in en). The full activation
+  contract from `progression_rules.md` lives in `player.md`
+  (Layer B); the compact HUD never repeats it, and the prose
+  must not re-narrate it either.
+
+## Labeled option presence (load-bearing)
+
+Presence in the prose is governed by **labeled options**, not by
+re-narration. The GM exposes a `[Artifact · <name>]` (en) /
+`〔法宝・<name>〕` (zh) labeled option **only on key beats** —
+the same key-beat list that gates trait labels (see
+`genre_packs/universal/prompts/gm_system_fragment.md`
+§ *Key beats*). Default cadence is **zero per turn**.
+
+Per-archetype priming shapes:
+
+- `insight` — primed at a pivot beat where revealing a hidden
+  truth, weakness, or pattern would change the player's options
+  (an investigation breakthrough; a conflict opening or endgame
+  where reading the opponent matters).
+- `bond_rescue` — primed only when `health_state` ∈
+  {`badly_hurt`, `critical`} AND the artifact is unused. Outside
+  that envelope it stays in the HUD but is never offered as a
+  labeled option.
+- `companion` — primed at a conflict pivot (open / endgame) or
+  on `risk_level == "lethal"` where dispatching, scouting, or
+  recruiting the artifact's helper unit changes the situation.
+
+Even when primed, the GM may emit zero labeled options if the
+turn is not a true pivot — exposition, recap, mid-conflict pacing
+turns without escalation. Across artifact + innate + destiny
+combined, **at most one labeled option appears per turn**. See
+*Pre-options scan*, *Key beats*, and *Labeled special options*
+in `genre_packs/universal/prompts/gm_system_fragment.md`.
+
+### What artifact labeled options are
+
+- A *special approach* the player may take. Picking the option
+  does **not** automatically succeed — the conflict ledger still
+  records costs and the outcome still has to play out.
+- An option body that **refers to the artifact by name** and
+  describes the *move*, not the artifact's mechanic. Re-narrating
+  the full activation contract in the option body is a failure;
+  the HUD already names the artifact.
+- A way to grant: information reveal (`insight`), survival
+  redirect / relocation (`bond_rescue`), or recruit/scout/dispatch
+  reach (`companion`) — within the activation rule from
+  `progression_rules.md` §3.
 
 ## What artifacts are NOT
 

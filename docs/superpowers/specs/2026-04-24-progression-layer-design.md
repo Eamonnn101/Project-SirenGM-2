@@ -202,6 +202,54 @@ both languages.
 - `playbooks/{ingest,new-game,play-turn,lint}.md` — wired through.
 - `README.md` — version note + changelog tranche.
 
+## Amendment 2026-04-25 — Build visibility tweak
+
+Playtesting (2026-04-25) surfaced two presence problems with the
+shipped v0.5 layer:
+
+1. **Artifact had very low presence.** It was on the HUD but
+   rarely surfaced inside a scene; the prose almost never
+   referenced it.
+2. **Innate traits felt unused.** They rarely affected options
+   or outcomes — the GM was treating them as flavor rather than
+   mechanical levers.
+
+Fix (no schema change; prompt + renderer only):
+
+- **Compact HUD artifact row** now includes ready/used status
+  inline (`<name>〔<archetype> · 待用/已用〕`). Status is visible
+  every turn without re-narrating the activation contract.
+- **`Triggerable` row** added to the compact HUD, conditional on
+  structured salience signals (conflict active, `health_state`
+  ∈ {`badly_hurt`, `critical`}, or `risk_level` ∈ {`tense`,
+  `dangerous`, `lethal`}). When salient, it lists the artifact
+  and trait names whose mechanic seeds plausibly fire this turn.
+  Suppressed entirely when nothing is in play. Implementation in
+  `tools/_hud.py :: _triggerable_row_value`.
+- **Pre-options build scan** added as Step 1a of
+  `playbooks/play-turn.md`. Before drafting A/B/C, the GM walks
+  the player's artifact + innate + destiny against the scene
+  signals and decides which (if any) to expose as labeled
+  options.
+- **Labeled special options** added to
+  `gm_system_fragment.md` § *Options format*. Format:
+  `〔法宝・<name>〕` / `〔<innate_label>〕` / `〔命格・<name>〕`
+  (zh) and `[Artifact · <name>]` / `[<Innate>]` /
+  `[Destiny · <name>]` (en). At most one labeled artifact option
+  per turn; trait labels are frequent in conflict / negotiation /
+  investigation / romance / escape / breakthrough but absent
+  from trivial turns. Labeled options replace one of A/B/C —
+  they do not add a fifth slot — and do not auto-succeed; the
+  conflict ledger still records costs.
+- **Per-archetype eligibility tables** added to
+  `systems/innate_traits.md`, `systems/destiny_traits.md`, and
+  `systems/artifacts.md`. Tables match the renderer's
+  `Triggerable` heuristic so the HUD's hint and the GM's
+  judgment stay aligned.
+- **No schema or save-file changes.** No new patch keys; no
+  `tools/_models.py` edits. The amendment is entirely in the
+  prompt + renderer surface.
+
 ## Settled design decisions
 
 Locked during planning (recorded in

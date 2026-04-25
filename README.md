@@ -17,8 +17,10 @@ immutable, the pack is an LLM-maintained persistent middle layer, and
 runtime reads from the compiled pack + structured save instead of
 re-deriving from raw text on every turn.
 
-**Version: v0.5** — adds the **progression layer**. A run now has
-build, breakthroughs, and a real ending:
+**Version: v0.5.1** — patch release on top of v0.5's progression
+layer. Same feature surface (build, breakthroughs, real ending),
+with a slimmer HUD and a much less chatty trait system after
+playtest:
 
 - **1 artifact + 3 innate traits** chosen at new-game (from 3 and 5
   universal archetype seeds).
@@ -36,9 +38,18 @@ build, breakthroughs, and a real ending:
   `saves/<pack>/meta_progress.json` (counters, seen-pool coverage,
   death history). **Unseen-first draft bias** on the menus until
   ~70% pool coverage, then free draw.
-- **Two-layer textual HUD** in zh/en: compact turn HUD at the top
-  of `current_scene.md`, full build HUD in `player.md` and
-  `inspect_save.py`.
+- **Single-line compact HUD** at the top of every chat reply:
+  `第 N 回 / 〔innate1〕〔innate2〕〔innate3〕 / 〔法宝・<name>〕 /
+  〔体况・<state>〕`, with optional `〔命格・…〕` and
+  `〔可发动・…〕` segments. Full build HUD (stage label,
+  activation contracts, exhausted flags, meta archive) lives in
+  `player.md` and `inspect_save.py`.
+- **BG3-style labeled options** (`〔法宝・<名>〕` / `〔才华〕` /
+  `〔命格・<名>〕`), surfaced **only on key beats** (conflict
+  open / escalation / endgame, health crisis, lethal risk, major
+  branching decision, investigation breakthrough, social pivot).
+  Default cadence: zero per turn; **at most one labeled option
+  per turn**, total.
 
 No XP, no numeric levels, no HP bar — every layer stays narrative.
 The universal genre pack ships mechanic seeds; ingest re-themes
@@ -249,6 +260,65 @@ is `render_save.py → lint_save.py → inspect_save.py`. The playbooks
 call these at the appropriate points.
 
 ## Changelog
+
+### v0.5.1 — HUD simplification + labeled-option pacing
+
+Patch release on top of v0.5. Two playtest-driven fixes; no
+schema or save-file changes; all 71 existing tests still pass.
+
+- **Compact HUD slimmed to a single line.** v0.5's Unicode-boxed
+  multi-row HUD ate visual space and competed with the narration
+  budget. Replaced with a single bare-line format:
+
+  ```
+  第 29 回 / 〔悟性过人〕〔以诚动人〕〔奇缘不断〕 / 〔法宝・观机古镜〕 / 〔体况・健康〕
+  ```
+
+  Sections joined by ` / `; each wrapped in `〔 〕`. Ready
+  artifact status is implicit (no marker); used artifacts get a
+  trailing `· 已用 / · used` inside the bracket. Health
+  warnings inline (`· ⚠`, `· ⚠⚠`, `· ☠`). Optional trailing
+  `〔命格・<name>〕…` per destiny trait, and
+  `〔可发动・<list>〕` when the situation is salient.
+- **Compact HUD now appears in chat reply.** v0.5's HUD lived
+  only in `current_scene.md`; chat-only LLM testers never saw it.
+  Step 5 of `playbooks/play-turn.md` now requires the bare HUD
+  line at the top of every reply, alongside the existing single-
+  line conflict HUD on conflict turns. Breakthrough/death turns
+  also keep the HUD line.
+- **Labeled-option cadence tightened.** v0.5's "frequent in
+  meaningful scenes" wording produced a `[Talent]` option on
+  almost every conflict turn, including quiet
+  thinking-it-through beats. Replaced with an explicit *Key
+  beats* list — conflict open / escalation / endgame, health
+  crisis, lethal risk, major branching decision, investigation
+  breakthrough, social pivot. **Default: zero labeled options
+  per turn.** **At most one labeled option per turn, total**,
+  across artifact + innate + destiny combined.
+- **Renderer salience tightened.** The HUD's `Triggerable`
+  segment now fires only on real pivots: conflict at a pivot
+  beat (just opened / endgame / `reversal_imminent`),
+  `health_state` ∈ {`badly_hurt`, `critical`}, or
+  `risk_level == "lethal"`. Generic `tense` risk and quiet
+  mid-conflict pacing turns no longer trigger.
+  Per-archetype eligibility tables in
+  `genre_packs/universal/systems/innate_traits.md`,
+  `artifacts.md`, and `destiny_traits.md` synchronized with
+  the renderer's heuristic (`tools/_hud.py`).
+- **Internals cleanup.** Removed the seven now-dead box-row
+  helpers in `tools/_hud.py` (`_artifact_row_value`,
+  `_innate_row_value`, `_destiny_row_value`, `_conflict_row_value`,
+  `_goals_row_value`, `_threads_row_value`,
+  `_format_label_value_rows`) and their unused label keys
+  (`risk_warn_*`, `momentum_*`, `used_marker`, `ready_marker`,
+  `destiny_sep`, `conflict_row_sep`, etc.). The Layer B build
+  HUD inside `player.md` is unchanged.
+
+Files touched: `tools/_hud.py`, `tools/render_save.py`,
+`genre_packs/universal/prompts/gm_system_fragment.md`,
+`genre_packs/universal/systems/{artifacts,innate_traits,destiny_traits}.md`,
+`playbooks/play-turn.md`,
+`docs/superpowers/specs/2026-04-24-progression-layer-design.md`.
 
 ### v0.5 — Progression layer
 
