@@ -41,7 +41,7 @@ discuss with the user and update the rule intentionally.
 python tools/lint_save.py --save <pack>/<save_id>
 ```
 
-Run this after checkpoint writes/rendering or before trusting a save on
+Run this after backup writes/rendering or before trusting a save on
 load/resume. This checks:
 
 - Every canonical JSON file parses and passes the Pydantic schemas.

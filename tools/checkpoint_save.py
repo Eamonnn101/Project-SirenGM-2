@@ -1,11 +1,12 @@
-"""Apply a compact checkpoint patch to a SirenGM save.
+"""Apply a compact backup patch to a SirenGM save.
 
 Usage:
     python tools/checkpoint_save.py --save <pack>/<save_id> --patch /tmp/patch.json --render --lint
 
-The patch is intentionally small. It updates canonical JSON, appends
-session-log entries in order, optionally maintains `context_summary.md`,
-and can run render/lint once at the end. It does not call an LLM.
+The patch is intentionally small. It updates backup JSON, appends
+detailed session-log entries in order, optionally rewrites
+`context_summary.md` when a 20-turn detail window rolls over, and can
+run render/lint once at the end. It does not call an LLM.
 """
 
 from __future__ import annotations
@@ -30,7 +31,6 @@ if __package__ is None or __package__ == "":
     from lint_save import lint_save
     from render_save import (
         CONTEXT_SUMMARY_FILENAME,
-        CONTEXT_SUMMARY_SOFT_CHARS,
         _read_pack_language,
         load_save,
         render_all,
@@ -48,7 +48,6 @@ else:
     from .lint_save import lint_save
     from .render_save import (
         CONTEXT_SUMMARY_FILENAME,
-        CONTEXT_SUMMARY_SOFT_CHARS,
         _read_pack_language,
         load_save,
         render_all,
@@ -64,10 +63,9 @@ PATCH_KEYS = {
     "open_loops_close",
     "hidden_truths_append",
     "session_log_entries",
-    "context_node",
     "context_summary_rewrite",
 }
-CONTEXT_PATCH_KEYS = {"context_node", "context_summary_rewrite"}
+CONTEXT_PATCH_KEYS = {"context_summary_rewrite"}
 
 
 def _read_patch(path: Path) -> dict[str, Any]:
@@ -98,11 +96,25 @@ def _has_context_rewrite(payload: dict[str, Any], turns: list[dict[str, Any]]) -
     )
 
 
-def _context_text(save_dir: Path) -> str:
-    path = save_dir / CONTEXT_SUMMARY_FILENAME
-    if not path.is_file():
-        return ""
-    return path.read_text(encoding="utf-8").strip()
+def _session_entries_count(payload: dict[str, Any], turns: list[dict[str, Any]]) -> int:
+    patches = list(turns)
+    if "turns" in payload:
+        patches.append(payload)
+    count = 0
+    for patch in patches:
+        rows = patch.get("session_log_entries", [])
+        if rows is None:
+            continue
+        if not isinstance(rows, list):
+            raise ValueError("session_log_entries must be a list")
+        count += len(rows)
+    return count
+
+
+def _crosses_compaction_boundary(old_count: int, new_count: int) -> bool:
+    if new_count <= 20:
+        return False
+    return (old_count - 1) // 20 < (new_count - 1) // 20
 
 
 def _validate_patch_keys(patch: dict[str, Any]) -> None:
@@ -252,16 +264,6 @@ def _write_context_summary(save_dir: Path, patch: dict[str, Any]) -> set[str]:
             raise ValueError("context_summary_rewrite must be a string")
         path.write_text(value.strip() + "\n", encoding="utf-8")
         changed.add(CONTEXT_SUMMARY_FILENAME)
-    if "context_node" in patch:
-        value = patch["context_node"]
-        if not isinstance(value, str):
-            raise ValueError("context_node must be a string")
-        node = value.strip()
-        if node:
-            current = path.read_text(encoding="utf-8").strip() if path.is_file() else ""
-            new_text = current + "\n\n" + node if current else node
-            path.write_text(new_text.rstrip() + "\n", encoding="utf-8")
-            changed.add(CONTEXT_SUMMARY_FILENAME)
     return changed
 
 
@@ -327,19 +329,19 @@ def apply_checkpoint_patch(
 ) -> tuple[int, list[str]]:
     payload = _read_patch(patch_path)
     turns = _turn_patches(payload)
-    context_text = _context_text(save_dir)
-    if context_text and len(context_text) > CONTEXT_SUMMARY_SOFT_CHARS:
+    save = load_save(save_dir)
+    old_count = len(save.session_log)
+    new_count = old_count + _session_entries_count(payload, turns)
+    if _crosses_compaction_boundary(old_count, new_count):
         if not _has_context_rewrite(payload, turns):
             return (
                 1,
                 [
-                    f"error: {CONTEXT_SUMMARY_FILENAME} exceeds "
-                    f"{CONTEXT_SUMMARY_SOFT_CHARS} chars; provide context_summary_rewrite "
-                    "before appending more context_node entries"
+                    "error: session_log.md detail window would exceed 20 turns; "
+                    f"provide context_summary_rewrite before archiving turn {new_count}"
                 ],
             )
 
-    save = load_save(save_dir)
     changed: set[str] = set()
     context_patches: list[dict[str, Any]] = []
     for turn_patch in turns:
@@ -376,7 +378,7 @@ def apply_checkpoint_patch(
         if context_patch:
             changed |= _write_context_summary(save_dir, context_patch)
     messages = [
-        "checkpoint applied: "
+        "backup applied: "
         + (", ".join(sorted(changed)) if changed else "no state changes")
     ]
 
@@ -399,7 +401,7 @@ def apply_checkpoint_patch(
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--save", required=True, help="path under saves/, typically <pack>/<save_id>")
-    parser.add_argument("--patch", required=True, type=Path, help="checkpoint patch JSON")
+    parser.add_argument("--patch", required=True, type=Path, help="backup patch JSON")
     parser.add_argument("--saves-root", type=Path, default=Path("saves"))
     parser.add_argument("--packs-root", type=Path, default=Path("packs"))
     parser.add_argument("--render", action="store_true", help="run render_save after applying the patch")

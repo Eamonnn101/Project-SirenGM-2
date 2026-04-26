@@ -12,10 +12,8 @@ active threads, objectives, open loops (count + titles), last
 narration preview, and divergence count. Output is plain text, one
 save per invocation.
 
-With `--active-summary`, prints a smaller checkpoint seed for the
-agent's in-conversation active state. It includes bounded compressed
-context memory and only the recent JSONL tail; the full session-log
-archive is not loaded for ordinary-turn context.
+With `--active-summary`, prints a legacy compact recovery seed. It is
+for diagnostics or save/load recovery, not the ordinary turn loop.
 """
 
 from __future__ import annotations
@@ -138,10 +136,10 @@ def _read_context_summary(save_dir: Path | None) -> str:
         return "(not loaded)"
     path = save_dir / CONTEXT_SUMMARY_FILENAME
     if not path.is_file():
-        return "(missing; create or update at the next checkpoint)"
+        return "(missing; create or update at the next backup)"
     text = path.read_text(encoding="utf-8").strip()
     if not text:
-        return "(empty; update at the next checkpoint)"
+        return "(empty; update at the next backup)"
     if len(text) <= CONTEXT_SUMMARY_SOFT_CHARS:
         return text
     preview = text[:CONTEXT_SUMMARY_ACTIVE_PREVIEW_CHARS].rstrip()
@@ -150,7 +148,7 @@ def _read_context_summary(save_dir: Path | None) -> str:
         + "\n"
         + (
             f"(context_summary is {len(text)} chars; exceeds "
-            f"{CONTEXT_SUMMARY_SOFT_CHARS}. 需在下一次 checkpoint 先压缩旧关键节点，"
+            f"{CONTEXT_SUMMARY_SOFT_CHARS}. 需在下一次 backup 先压缩旧记忆，"
             "再追加新关键节点。)"
         )
     )
@@ -178,11 +176,11 @@ def _compact_inline(text: str, *, limit: int) -> str:
 
 
 def format_active_summary(save, *, save_dir: Path | None = None, language: str | None = None) -> str:
-    """Compact checkpoint seed for ordinary-turn play.
+    """Compact recovery seed for diagnostics.
 
-    `effective_turn` and `last_checkpoint_turn` are equal because this tool
-    reads only canonical JSON. During play, private turn notes are tracked
-    in conversation and folded into the next checkpoint.
+    `effective_turn` and `last_backup_turn` are equal because this tool
+    reads only backup JSON. Ongoing play should normally continue from
+    conversation context rather than this output.
     """
     w = save.world
     p = w.player
@@ -196,7 +194,7 @@ def format_active_summary(save, *, save_dir: Path | None = None, language: str |
         f"pack: {save.pack_name}",
         f"language: {language or 'unknown'}",
         f"effective_turn: {w.turn}",
-        f"last_checkpoint_turn: {w.turn}",
+        f"last_backup_turn: {w.turn}",
         f"hud: {render_compact_turn_hud(save, HL)}",
         f"scene: {w.current_location}",
         f"time: day {w.day} {w.time_of_day}",
@@ -235,7 +233,7 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument(
         "--active-summary",
         action="store_true",
-        help="print the compact active-state seed used between checkpoints",
+        help="print a compact recovery seed (not for ordinary turn context)",
     )
     args = p.parse_args(argv)
     save_dir = args.saves_root / args.save

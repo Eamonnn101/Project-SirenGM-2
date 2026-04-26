@@ -82,7 +82,7 @@ Bundled into the same terminal turn:
      terminal event.
    - Any `relationship_updates`, `open_loops_close`,
      `inventory_*` the death plausibly implies.
-2. **File writes (play-turn.md immediate checkpoint plus this playbook):**
+2. **File writes (play-turn.md immediate backup plus this playbook):**
    - Normal persist: `world_state.json`, `player.json`,
      `session_log.jsonl`.
    - Write `saves/<pack>/<save_id>/run_summary.md` — 200–400
@@ -100,7 +100,7 @@ Bundled into the same terminal turn:
      `DeathRecord`, bumps `deaths_count`, updates
      `best_stage_index`. Does NOT touch `runs_finished`.
    - Run `tools/render_save.py` and `tools/lint_save.py` as part of
-     the immediate checkpoint. Lint requires `run_summary.md` on a
+     the immediate backup. Lint requires `run_summary.md` on a
      `health_state == "dead"` save; the file is written above, so
      lint should pass.
 

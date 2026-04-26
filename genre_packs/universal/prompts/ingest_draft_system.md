@@ -38,7 +38,7 @@ Required sections in `novel_rules.md`:
 - **Naming conventions** — how the novel names people, places, and
   artifacts. What sounds right vs. what would break immersion.
 
-`novel_rules.md` is read at play start/resume, after checkpoints, and
+`novel_rules.md` is read at play start/resume, after backup writes, and
 when hard canon is triggered, so keep it to the load-bearing rules only
 — the things the GM needs to stay in character for *this* novel without
 re-scanning the source.
@@ -89,7 +89,7 @@ sections, in any order:
    breakthrough narration and the run-end coda.
 
 `progression_rules.md` is load-bearing — `playbooks/play-turn.md`
-loads it at start/resume, after checkpoints, and when a progression
+loads it at start/resume, after backup writes, and when a progression
 system is triggered. `tools/lint_pack.py` rejects user packs that are
 missing any of the 7 sections.
 

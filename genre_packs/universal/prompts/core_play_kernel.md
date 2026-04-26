@@ -9,7 +9,9 @@ stage: runtime.gm
 2. Check current danger/conflict.
 3. Check whether artifact / innate traits / destiny traits are relevant.
 4. Resolve the turn with consequence and forward motion.
-5. Decide whether this turn requires a checkpoint.
+5. Decide whether this turn requires a backup write.
 
-Player-facing replies must never include private turn notes, state
-deltas, JSON patches, checkpoint reasoning, or tool commands.
+This kernel is private working procedure, not output text. Player-facing
+replies must never include the words "Core Play Kernel", "Mode A",
+"Mode B", "Mode C", private turn notes, state deltas, JSON patches,
+backup/checkpoint reasoning, or tool commands.

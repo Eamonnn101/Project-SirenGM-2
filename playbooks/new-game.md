@@ -120,9 +120,8 @@ Create `saves/<pack>/<save_id>/` and write:
 - `open_loops.json` — `{"items": []}`.
 - `player.json` — duplicate of `world_state.json::player`.
 - `session_log.jsonl` — empty file (`touch` it).
-- `context_summary.md` — initial key-node memory in the pack's language,
-  e.g. `## 关键经过` followed by
-  `**开局（0 回）**：新局开始，尚无长期剧情记忆。`
+- `context_summary.md` — empty recovery summary file. It is populated
+  only after a detailed session-log window rolls past 20 turns.
 - `divergences.jsonl` — empty file.
 
 **Also** update (or create) `saves/<pack>/meta_progress.json`:

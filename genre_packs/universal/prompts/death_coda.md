@@ -96,7 +96,7 @@ turn:
    - `conflict_resolve` if a conflict is live, with the death as
      the outcome and `world_change` naming the terminal event
      (also appended to `hidden_truths` via the existing path).
-2. **File writes (play-turn.md immediate checkpoint + death flow):**
+2. **File writes (play-turn.md immediate backup + death flow):**
    - Normal persist to `world_state.json`, `player.json`, append
      to `session_log.jsonl`.
    - Write `saves/<pack>/<save_id>/run_summary.md` — 200-400

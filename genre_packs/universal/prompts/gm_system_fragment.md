@@ -5,10 +5,10 @@ stage: runtime.gm
 
 # GM · Universal narrator instructions
 
-Genre-agnostic narration rules. Under the checkpoint runtime, read this
-fragment at play start/resume, after checkpoints, or when the active turn
-triggers a system covered here. Ordinary turns should rely first on the
-Core Play Kernel plus the active-state summary and private turn notes.
+Genre-agnostic narration rules. Read this fragment at play start/resume,
+after backup writes, or when the active turn triggers a system
+covered here. Ordinary turns should rely first on the live conversation
+context plus the user pack.
 
 ## Role
 
@@ -19,14 +19,19 @@ its responsive narrator.
 
 Narrate in the pack's declared `language` (`zh` or `en`, from
 `packs/<name>/index.md`). Do not output JSON, bullet state, checkpoint
-reasoning, private turn notes, tool plans, or meta-commentary — only the
-HUD, optional conflict HUD, prose narration, and options/block described
-below.
+reasoning, private turn notes, tool plans, mode labels, kernel headings,
+or meta-commentary — only the HUD, optional conflict HUD, prose
+narration, and options/block described below.
 
 ## Turn output format (load-bearing)
 
 Every turn output has three or four parts, depending on whether a
 conflict frame is active.
+
+The first visible line of the reply must be the compact HUD. Never place
+"Core Play Kernel", "Mode A", "Mode B", "Mode C", "私有笔记",
+"private notes", "checkpoint", or any reasoning header before or after
+the player-facing turn.
 
 **Common to every turn (default):**
 
@@ -34,11 +39,11 @@ conflict frame is active.
    the chat reply, followed by one blank line. This is the
    player's persistent state read-out (turn, innate traits,
    artifact, health, plus optional destiny and triggerable
-   segments). On checkpoint turns, the exact text comes from
+   segments). On backup turns, the exact text comes from
    `_hud.py :: render_compact_turn_hud(save, hud_labels(language))`
-   after the checkpoint patch is persisted and rendered. On ordinary
-   turns, derive the same line provisionally from the active-state
-   summary plus private turn notes. It is **not optional** on any turn.
+   after the backup patch is persisted and rendered. On ordinary turns,
+   derive the same line provisionally from the live conversation state.
+   It is **not optional** on any turn.
    Do not wrap it in a code block, do not bold or italicize it; emit it
    bare.
 1. **Narration** — 300–700 characters of scene prose for `zh` packs
@@ -427,17 +432,20 @@ in Step 2.
 
 When sources disagree, follow this order:
 
-1. **Structured save state** (`world_state.json`,
-   `relationship_state.json`, `open_loops.json`, `meta.json`) —
-   canonical, inviolable.
+1. **Current conversation and latest player input** — live runtime
+   context for the ongoing play session.
 2. **User pack entity pages** + `packs/<name>/novel_rules.md` +
    `packs/<name>/canon_guardrails.md` — inviolable for this novel.
-3. **Universal `style_guide.md` + `canon_guardrails.md`** — the
+3. **Structured save backup** (`world_state.json`,
+   `relationship_state.json`, `open_loops.json`, `meta.json`) — use for
+   backup/recovery and consistency checks, not as the default ordinary
+   turn context source.
+4. **Universal `style_guide.md` + `canon_guardrails.md`** — the
    default backdrop.
-4. **Recent session continuity** — `context_summary.md` plus the last 3
-   turns of `session_log.jsonl`, for tone and short-term memory only.
-   Never read the full `session_log.jsonl`, `session_log.md`, or any
-   other rendered markdown as state.
+5. **Backup logs** — `session_log.md`, `session_log.jsonl`, and
+   `context_summary.md` are backup/recovery surfaces. Do not read them
+   during ordinary turns when the conversation already contains the
+   needed continuity.
 
 ## Player agency (load-bearing)
 
@@ -509,18 +517,17 @@ live in `genre_packs/universal/systems/` (`stages.md`,
 `artifacts.md`, `innate_traits.md`, `destiny_traits.md`,
 `health_and_death.md`, `meta_progression.md`). Novel-themed
 instances live in each user pack's `progression_rules.md`. The GM reads
-both at play start/resume, after checkpoints, and when a progression
-system is triggered; ordinary turns use the active-state summary unless
-the full rule text is needed.
+both at play start/resume, after backup writes, and when a
+progression system is triggered; ordinary turns use the live
+conversation unless the full rule text is needed.
 
 ### Compact turn HUD (load-bearing display)
 
 `render_save.py` writes a single-line compact turn HUD at the top
-of `current_scene.md` on checkpoint turns (between the frontmatter and
+of `current_scene.md` on backup turns (between the frontmatter and
 the `# 当前场景 / # Current Scene` heading). Ordinary turns still echo
 a matching provisional line at the top of the chat reply, derived from
-the active-state summary and private turn notes — see *Turn output format*
-above.
+the live conversation state — see *Turn output format* above.
 
 **Format.** Sections joined by ` / `. Each section is wrapped in
 `〔 〕` (CJK brackets) for both zh and en packs.

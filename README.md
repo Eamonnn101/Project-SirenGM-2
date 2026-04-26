@@ -12,7 +12,7 @@ run history.
 The product path is:
 
 ```text
-novel text -> generated pack -> checkpointed save -> playable run
+novel text -> generated pack -> backed-up save -> playable run
 ```
 
 There is no app server, daemon, web UI, or custom game CLI. Claude Code
@@ -27,36 +27,31 @@ pattern: an LLM incrementally compiles raw source material into a
 persistent, structured middle layer instead of re-deriving everything
 from raw text on every interaction. SirenGM adapts that idea from
 personal knowledge bases to playable fiction: raw novel -> generated
-story pack -> checkpointed game state.
+story pack -> backed-up game state.
 
 ## Current Version
 
-**v0.6.0 - Core Play Kernel + checkpoint runtime**
+**v0.6.0 - Core Play Kernel + backup runtime**
 
 This release focuses on performance and weak-model compatibility. The
 full gameplay surface remains intact, but ordinary turns no longer ask
 the model to reread and rewrite the whole project state every time.
 
-- **Core Play Kernel:** every turn follows five stable rules: understand
-  intent, check danger/conflict, check relevant artifact/trait hooks,
-  resolve with consequence, then decide whether to checkpoint.
-- **Checkpoint runtime:** ordinary turns use conversation context, a
-  compact active-state summary, and private turn notes. Full JSON
-  writes, markdown render, and save lint happen only when a checkpoint
-  is actually useful or mandatory.
-- **Key-node memory:** long runs keep the full `session_log.jsonl`
-  archive, but ordinary play uses `context_summary.md` as a compact
-  key-node memory plus a bounded active summary.
-- **Lightweight log index:** `session_log.md` now lists every turn as a
-  one-line index only. Full narration/options stay in JSONL so older
-  turn lookup does not tempt the model to ingest the whole archive.
-- **Immediate checkpoints:** death, critical/dead health, breakthrough,
+- **Core Play Kernel:** every turn privately follows five stable rules:
+  understand intent, check danger/conflict, check relevant
+  artifact/trait hooks, resolve with consequence, then decide whether to
+  write a backup.
+- **Backup runtime:** ordinary turns use the conversation window and the
+  pack. Save files are durability/recovery surfaces, not the default
+  information source.
+- **20-turn log compression:** `session_log.md` stores detailed recent
+  turn backups. When that detailed window exceeds 20 turns, the agent
+  compresses the completed window into `context_summary.md` and keeps the
+  detailed archive in `session_log.jsonl`.
+- **Immediate backup triggers:** death, critical/dead health, breakthrough,
   destiny gain/exhaustion, artifact use/exhaustion, conflict resolution,
   major scene/world/faction change, important NPC death or betrayal,
   restart, explicit save request, or major source-novel divergence.
-- **Active summary support:** `tools/inspect_save.py --active-summary`
-  prints the compact state seed used between checkpoints, including the
-  canonical HUD line.
 
 The goal is simple: preserve SirenGM's core experience while reducing
 per-turn cognitive load and file I/O.
@@ -108,8 +103,9 @@ per-turn cognitive load and file I/O.
 5. Play in character. The agent follows `playbooks/play-turn.md`.
 
 During play, you can ask for a save/checkpoint at any time. The agent
-will flush unwritten state to canonical JSON, render markdown, lint the
-save, and refresh the active summary.
+will write a backup to canonical JSON, render markdown, and lint the
+save. It should continue ordinary play from conversation context, not by
+reloading the save.
 
 ## Repository Layout
 
@@ -153,9 +149,9 @@ saves/<pack>/<save_id>/
   canonical JSON + rendered markdown for one run
 ```
 
-### Source Of Truth
+### Backup Files
 
-Structured JSON is authoritative at checkpoints:
+Structured JSON is authoritative when a backup is read or written:
 
 - `world_state.json`
 - `relationship_state.json`
@@ -165,21 +161,19 @@ Structured JSON is authoritative at checkpoints:
 - `session_log.jsonl`
 - `divergences.jsonl`
 
-`context_summary.md` is durable compressed memory for long runs. It is
-maintained as key-node paragraphs such as
-`**嘉兴之行（29–45 回）**：...`, not as a HUD, NPC table, or mini wiki.
-It is used for prompt context, but canonical JSON wins if they disagree.
+`context_summary.md` is compressed recovery memory for completed
+20-turn windows. It is not ordinary prompt context while the conversation
+window still contains the run.
 
 Rendered markdown files such as `current_scene.md`, `player.md`,
 `session_log.md`, and `hidden_truths.md` are display surfaces. They are
 regenerated from JSON and should never be scraped for canonical state.
-`session_log.md` is a lightweight all-turn index; the full archive
-remains in `session_log.jsonl`.
+`session_log.md` renders the latest detailed backup window; the full
+archive remains in `session_log.jsonl`.
 
-Between checkpoints, ordinary turns may carry compact private turn notes
-inside the conversation. These notes are never part of the player-facing
-reply. Any immediate-trigger fact must be flushed to
-JSON before it is treated as durable.
+Ordinary turns should not refresh themselves from save files. Continue
+from conversation context and pack rules; write backups only when useful
+or mandatory.
 
 ## Runtime Loop
 
@@ -188,16 +182,15 @@ JSON before it is treated as durable.
 The agent uses:
 
 - recent conversation;
-- compressed memory from `context_summary.md`;
-- active state summary from `inspect_save.py --active-summary`;
-- private turn notes;
+- the relevant pack files, especially `novel_rules.md`,
+  `progression_rules.md`, and current entity pages;
 - narrow triggered references only when needed.
 
-No full save render/lint is required unless the agent judges the state
-should be made durable, the user asks to save, or the turn fires an
-immediate trigger.
+No save read/write/render/lint is required unless the agent judges the
+state should be backed up, the user asks to save, or the turn fires an
+immediate backup trigger.
 
-### Checkpoint Turn
+### Backup Turn
 
 The agent applies noted turns in chronological order:
 
@@ -207,23 +200,20 @@ The agent applies noted turns in chronological order:
 4. append that turn's session-log entry;
 5. move to the next noted turn.
 
-After every noted turn has been prepared, the agent should prefer the
-checkpoint helper and render/lint once:
+After backup entries have been prepared, the agent should prefer the
+backup helper and render/lint once:
 
 ```bash
 python tools/checkpoint_save.py --save <pack>/<save_id> --patch /tmp/<patch>.json --render --lint
-python tools/inspect_save.py --save <pack>/<save_id> --active-summary
 ```
 
 This preserves ordered effects such as conflict ledgers, survival-trigger
 precedence, stage breakthrough into destiny pick, and session-log turn
 numbers without paying full I/O cost every ordinary turn.
 
-For long runs, checkpoint appends a `context_node` only when a durable
-story beat occurs. If `context_summary.md` grows past roughly 2200
-characters, compress older nodes into broader ranges before appending
-new ones. The LLM should never read the complete session archive for
-ordinary play.
+If the backup crosses a 20-turn detailed log window, provide
+`context_summary_rewrite` in the patch so the completed window is
+compressed before the next detailed window begins.
 
 ## Core Gameplay Systems
 
@@ -263,11 +253,10 @@ LLM.
 | `python tools/chunker.py <novel> --pack <pack>` | Split source text into ingest chunks. |
 | `python tools/lint_pack.py --pack <pack>` | Validate a generated user pack. |
 | `python tools/lint_pack.py --genre universal` | Validate the shipped universal genre pack. |
-| `python tools/checkpoint_save.py --save <pack>/<save_id> --patch <patch.json> --render --lint` | Apply a compact checkpoint patch, append logs, maintain context summary, render, and lint. |
-| `python tools/render_save.py --save <pack>/<save_id>` | Render markdown surfaces from canonical JSON; `session_log.md` is a lightweight all-turn index. |
-| `python tools/lint_save.py --save <pack>/<save_id>` | Validate a checkpointed save. |
+| `python tools/checkpoint_save.py --save <pack>/<save_id> --patch <patch.json> --render --lint` | Apply a compact backup patch, append detailed logs, enforce 20-turn compression, render, and lint. |
+| `python tools/render_save.py --save <pack>/<save_id>` | Render markdown surfaces from canonical JSON; `session_log.md` is the latest detailed backup window. |
+| `python tools/lint_save.py --save <pack>/<save_id>` | Validate a backed-up save. |
 | `python tools/inspect_save.py --save <pack>/<save_id>` | Print a compact save summary. |
-| `python tools/inspect_save.py --save <pack>/<save_id> --active-summary` | Print bounded context memory, recent JSONL tail, and the active-state seed. |
 
 Optional local setup:
 
@@ -290,7 +279,7 @@ The agent reads the relevant playbook before acting:
 
 - `playbooks/ingest.md` - compile novels into packs.
 - `playbooks/new-game.md` - create a save and initial build.
-- `playbooks/play-turn.md` - run ordinary and checkpoint turns.
+- `playbooks/play-turn.md` - run ordinary turns and backup turns.
 - `playbooks/death-and-restart.md` - handle death, completion, and restart.
 - `playbooks/lint.md` - inspect pack/save health.
 
@@ -309,16 +298,15 @@ Important rules:
 ### v0.6.0
 
 - Added the Core Play Kernel prompt.
-- Reworked `playbooks/play-turn.md` around ordinary turns,
-  agent-decided checkpoints, and immediate checkpoints.
-- Added the private turn-notes contract.
-- Added `inspect_save.py --active-summary`.
-- Changed runtime guidance so full save render/lint happens at
-  checkpoints instead of every turn.
-- Added context-summary compression so long session logs stay archived
-  without becoming ordinary-turn prompt context.
-- Changed `session_log.md` to a lightweight all-turn index and added
-  `checkpoint_save.py` for compact checkpoint patches.
+- Reworked `playbooks/play-turn.md` so ordinary turns use conversation
+  and pack context; saves are backups, not the default information
+  source.
+- Added a hard player-facing output ban for kernel/mode/private-note
+  leakage.
+- Added 20-turn session-log compression: `session_log.md` keeps detailed
+  recent backups, `session_log.jsonl` keeps the archive, and
+  `context_summary.md` stores compressed recovery memory.
+- Added `checkpoint_save.py` for compact backup patches.
 
 ### v0.5.x
 
