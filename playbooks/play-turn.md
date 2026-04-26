@@ -21,7 +21,7 @@ per-turn checklist:
 5. Decide whether this turn needs a backup write.
 
 The kernel is never player-facing. Never print "Core Play Kernel",
-"Mode A", "Mode B", "Mode C", checkpoint reasoning, private notes,
+"Mode A", "Mode B", "Mode C", backup reasoning, private notes,
 pending state, JSON patches, or tool commands in the chat reply.
 
 ## Context Sources
@@ -40,15 +40,21 @@ Use this priority during ordinary play:
    read save logs during ordinary turns when the conversation already
    contains the needed continuity.
 
-`context_summary.md`, `session_log.md`, and `session_log.jsonl` are
-backup/recovery surfaces. They are not the normal prompt context.
+`context_summary.md` and `session_log.md` are recovery surfaces. Read
+them only when switching LLMs, after the model's conversation context is
+lost, or when the user explicitly asks to load/recover from disk. In
+that case, read `context_summary.md` plus the latest five detailed turns
+already rendered in `session_log.md`.
+
+Never read `session_log.jsonl` for ordinary play or recovery prompting.
+It is the complete archive for tooling, lint, audit, and replay only.
 
 ## Backup Policy
 
 There is no fixed every-turn persistence requirement. Ordinary turns can
 advance from conversation context. Write a backup when:
 
-- the user explicitly asks to save/checkpoint/存档;
+- the user explicitly asks to save/存档;
 - a durable high-impact event occurs (death, critical health, stage
   breakthrough, destiny gain/exhaustion, artifact use/exhaustion,
   conflict resolution, major scene/location transition, major
@@ -59,19 +65,21 @@ advance from conversation context. Write a backup when:
 Backup writes are for durability only. Do not refresh the prompt from
 the backup after every write.
 
-## Session Log Compression
+## Recovery Memory
 
-`session_log.md` is the detailed rolling backup window. It should render
-full recent turn details: player input, narration, options, and summary.
+`session_log.md` is the detailed five-turn recovery window. It should
+render full recent turn details: player input, narration, options, and
+summary.
 
-Compression rule:
+Simple rule:
 
-- If the detailed `session_log.md` window has fewer than 20 turns, do
-  nothing extra.
-- When the detailed window would exceed 20 turns, compress the completed
-  window into `context_summary.md`, append the detailed turn entries to
-  `session_log.jsonl`, then continue with a fresh recent-detail window.
-- Repeat this every time another 20-turn window is exceeded.
+- If the run has five or fewer backed-up turns, do nothing extra.
+- After that, every backup should rewrite `context_summary.md` as
+  readable key-node memory covering everything before the latest five
+  turns, then render `session_log.md` with only the latest five detailed
+  turns.
+- Keep `context_summary.md` as short prose key nodes. Do not add tables,
+  HUD mirrors, NPC rosters, or current-state lists that duplicate JSON.
 
 The LLM writes the compression text because it requires narrative
 judgment. Tools only persist and render the backup surfaces.
@@ -98,9 +106,9 @@ Use this path when a backup write is needed.
 2. Apply state changes in chronological order. Do not merge multiple
    turns into a final-state blob if intermediate costs/triggers matter.
 3. Append one detailed `SessionLogEntry` per backed-up turn.
-4. If the backup crosses a 20-turn log window, rewrite
-   `context_summary.md` with compressed memory through the completed
-   window.
+4. If the run has more than five backed-up turns, rewrite
+   `context_summary.md` with readable key-node memory covering the
+   older material before the latest five turns.
 5. Run the backup helper when possible:
 
    ```bash
@@ -127,7 +135,7 @@ The chat reply keeps this shape:
   block from `breakthrough_pick.md` or `death_coda.md`.
 
 Hard ban: the player-facing reply must not contain internal headings,
-kernel checklists, mode names, checkpoint decisions, private notes,
+kernel checklists, mode names, backup decisions, private notes,
 pending buffers, JSON patches, or tool commands. If such text appears in
 the draft, delete it before sending. The first visible line must be the
 compact HUD.

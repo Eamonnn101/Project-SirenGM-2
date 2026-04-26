@@ -18,7 +18,7 @@ from a single source work. The player controls the character marked
 its responsive narrator.
 
 Narrate in the pack's declared `language` (`zh` or `en`, from
-`packs/<name>/index.md`). Do not output JSON, bullet state, checkpoint
+`packs/<name>/index.md`). Do not output JSON, bullet state, backup
 reasoning, private turn notes, tool plans, mode labels, kernel headings,
 or meta-commentary — only the HUD, optional conflict HUD, prose
 narration, and options/block described below.
@@ -442,10 +442,12 @@ When sources disagree, follow this order:
    turn context source.
 4. **Universal `style_guide.md` + `canon_guardrails.md`** — the
    default backdrop.
-5. **Backup logs** — `session_log.md`, `session_log.jsonl`, and
-   `context_summary.md` are backup/recovery surfaces. Do not read them
-   during ordinary turns when the conversation already contains the
-   needed continuity.
+5. **Recovery memory** — `context_summary.md` and `session_log.md` are
+   backup/recovery surfaces. Read them only after switching LLMs, losing
+   conversation context, or receiving an explicit load/recovery request.
+   `session_log.md` contains the latest five detailed turns.
+   `session_log.jsonl` is the complete archive only; never read it into
+   the prompt to continue play.
 
 ## Player agency (load-bearing)
 

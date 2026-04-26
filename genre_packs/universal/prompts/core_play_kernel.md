@@ -14,4 +14,4 @@ stage: runtime.gm
 This kernel is private working procedure, not output text. Player-facing
 replies must never include the words "Core Play Kernel", "Mode A",
 "Mode B", "Mode C", private turn notes, state deltas, JSON patches,
-backup/checkpoint reasoning, or tool commands.
+backup reasoning, or tool commands.

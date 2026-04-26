@@ -44,10 +44,10 @@ the model to reread and rewrite the whole project state every time.
 - **Backup runtime:** ordinary turns use the conversation window and the
   pack. Save files are durability/recovery surfaces, not the default
   information source.
-- **20-turn log compression:** `session_log.md` stores detailed recent
-  turn backups. When that detailed window exceeds 20 turns, the agent
-  compresses the completed window into `context_summary.md` and keeps the
-  detailed archive in `session_log.jsonl`.
+- **Recovery memory:** save files are backups. If a new LLM has to
+  continue the run or the conversation context is lost, read
+  `context_summary.md` plus the latest five detailed turns in
+  `session_log.md`. `session_log.jsonl` is the full archive only.
 - **Immediate backup triggers:** death, critical/dead health, breakthrough,
   destiny gain/exhaustion, artifact use/exhaustion, conflict resolution,
   major scene/world/faction change, important NPC death or betrayal,
@@ -102,7 +102,7 @@ per-turn cognitive load and file I/O.
 
 5. Play in character. The agent follows `playbooks/play-turn.md`.
 
-During play, you can ask for a save/checkpoint at any time. The agent
+During play, you can ask for a save at any time. The agent
 will write a backup to canonical JSON, render markdown, and lint the
 save. It should continue ordinary play from conversation context, not by
 reloading the save.
@@ -161,19 +161,23 @@ Structured JSON is authoritative when a backup is read or written:
 - `session_log.jsonl`
 - `divergences.jsonl`
 
-`context_summary.md` is compressed recovery memory for completed
-20-turn windows. It is not ordinary prompt context while the conversation
-window still contains the run.
+`context_summary.md` is compressed recovery memory. It is not ordinary
+prompt context while the conversation window still contains the run.
 
 Rendered markdown files such as `current_scene.md`, `player.md`,
 `session_log.md`, and `hidden_truths.md` are display surfaces. They are
 regenerated from JSON and should never be scraped for canonical state.
-`session_log.md` renders the latest detailed backup window; the full
-archive remains in `session_log.jsonl`.
+`session_log.md` renders the latest five detailed turns for recovery;
+the full archive remains in `session_log.jsonl`.
 
 Ordinary turns should not refresh themselves from save files. Continue
 from conversation context and pack rules; write backups only when useful
 or mandatory.
+
+When switching LLMs, after losing conversation context, or on explicit
+load/recovery, read `context_summary.md` and the rendered
+`session_log.md`. Do not read `session_log.jsonl` into the prompt; it is
+for archive, lint, audit, and replay tooling.
 
 ## Runtime Loop
 
@@ -211,9 +215,9 @@ This preserves ordered effects such as conflict ledgers, survival-trigger
 precedence, stage breakthrough into destiny pick, and session-log turn
 numbers without paying full I/O cost every ordinary turn.
 
-If the backup crosses a 20-turn detailed log window, provide
-`context_summary_rewrite` in the patch so the completed window is
-compressed before the next detailed window begins.
+Once the run has more than five backed-up turns, provide
+`context_summary_rewrite` in each backup patch so older material remains
+available as readable key-node memory while `session_log.md` stays small.
 
 ## Core Gameplay Systems
 
@@ -253,8 +257,8 @@ LLM.
 | `python tools/chunker.py <novel> --pack <pack>` | Split source text into ingest chunks. |
 | `python tools/lint_pack.py --pack <pack>` | Validate a generated user pack. |
 | `python tools/lint_pack.py --genre universal` | Validate the shipped universal genre pack. |
-| `python tools/checkpoint_save.py --save <pack>/<save_id> --patch <patch.json> --render --lint` | Apply a compact backup patch, append detailed logs, enforce 20-turn compression, render, and lint. |
-| `python tools/render_save.py --save <pack>/<save_id>` | Render markdown surfaces from canonical JSON; `session_log.md` is the latest detailed backup window. |
+| `python tools/checkpoint_save.py --save <pack>/<save_id> --patch <patch.json> --render --lint` | Apply a compact backup patch, append detailed logs, keep recovery memory current after the first five turns, render, and lint. |
+| `python tools/render_save.py --save <pack>/<save_id>` | Render markdown surfaces from canonical JSON; `session_log.md` is the latest five-turn recovery window. |
 | `python tools/lint_save.py --save <pack>/<save_id>` | Validate a backed-up save. |
 | `python tools/inspect_save.py --save <pack>/<save_id>` | Print a compact save summary. |
 
@@ -303,9 +307,9 @@ Important rules:
   source.
 - Added a hard player-facing output ban for kernel/mode/private-note
   leakage.
-- Added 20-turn session-log compression: `session_log.md` keeps detailed
-  recent backups, `session_log.jsonl` keeps the archive, and
-  `context_summary.md` stores compressed recovery memory.
+- Added recovery-memory backups: `session_log.md` keeps the latest five
+  detailed turns, `session_log.jsonl` keeps the archive, and
+  `context_summary.md` stores readable key-node memory for recovery.
 - Added `checkpoint_save.py` for compact backup patches.
 
 ### v0.5.x

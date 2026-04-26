@@ -4,9 +4,9 @@ Usage:
     python tools/checkpoint_save.py --save <pack>/<save_id> --patch /tmp/patch.json --render --lint
 
 The patch is intentionally small. It updates backup JSON, appends
-detailed session-log entries in order, optionally rewrites
-`context_summary.md` when a 20-turn detail window rolls over, and can
-run render/lint once at the end. It does not call an LLM.
+detailed session-log entries in order, rewrites `context_summary.md`
+whenever backed-up play has more than five turns, and can run render/lint
+once at the end. It does not call an LLM.
 """
 
 from __future__ import annotations
@@ -31,6 +31,7 @@ if __package__ is None or __package__ == "":
     from lint_save import lint_save
     from render_save import (
         CONTEXT_SUMMARY_FILENAME,
+        SESSION_LOG_DETAIL_LIMIT,
         _read_pack_language,
         load_save,
         render_all,
@@ -48,6 +49,7 @@ else:
     from .lint_save import lint_save
     from .render_save import (
         CONTEXT_SUMMARY_FILENAME,
+        SESSION_LOG_DETAIL_LIMIT,
         _read_pack_language,
         load_save,
         render_all,
@@ -111,10 +113,8 @@ def _session_entries_count(payload: dict[str, Any], turns: list[dict[str, Any]])
     return count
 
 
-def _crosses_compaction_boundary(old_count: int, new_count: int) -> bool:
-    if new_count <= 20:
-        return False
-    return (old_count - 1) // 20 < (new_count - 1) // 20
+def _needs_context_rewrite(added_entries: int, new_count: int) -> bool:
+    return added_entries > 0 and new_count > SESSION_LOG_DETAIL_LIMIT
 
 
 def _validate_patch_keys(patch: dict[str, Any]) -> None:
@@ -330,15 +330,16 @@ def apply_checkpoint_patch(
     payload = _read_patch(patch_path)
     turns = _turn_patches(payload)
     save = load_save(save_dir)
-    old_count = len(save.session_log)
-    new_count = old_count + _session_entries_count(payload, turns)
-    if _crosses_compaction_boundary(old_count, new_count):
+    added_entries = _session_entries_count(payload, turns)
+    new_count = len(save.session_log) + added_entries
+    if _needs_context_rewrite(added_entries, new_count):
         if not _has_context_rewrite(payload, turns):
             return (
                 1,
                 [
-                    "error: session_log.md detail window would exceed 20 turns; "
-                    f"provide context_summary_rewrite before archiving turn {new_count}"
+                    "error: backups beyond the latest "
+                    f"{SESSION_LOG_DETAIL_LIMIT} turns require "
+                    f"context_summary_rewrite before archiving turn {new_count}"
                 ],
             )
 

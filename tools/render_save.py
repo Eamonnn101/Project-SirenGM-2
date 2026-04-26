@@ -71,10 +71,9 @@ else:
 # ---------------------------------------------------------------------------
 
 CONTEXT_SUMMARY_FILENAME = "context_summary.md"
-RECENT_SESSION_LOG_LIMIT = 3
 CONTEXT_SUMMARY_SOFT_CHARS = 2_200
 CONTEXT_SUMMARY_ACTIVE_PREVIEW_CHARS = 1_000
-SESSION_LOG_DETAIL_LIMIT = 20
+SESSION_LOG_DETAIL_LIMIT = 5
 
 LABELS: dict[str, dict[str, str]] = {
     "zh": {
@@ -95,8 +94,8 @@ LABELS: dict[str, dict[str, str]] = {
         "player_inventory": "物品",
         "session_log": "本局日志",
         "session_log_window_note": (
-            "仅显示最近 {limit} 回合的详细备份；更早完整备份保留在 "
-            "`session_log.jsonl`，压缩记忆保留在 `context_summary.md`。"
+            "仅显示最近 {limit} 回合的详细恢复窗口；更早完整记录仅归档在 "
+            "`session_log.jsonl`，恢复记忆保留在 `context_summary.md`。"
         ),
         "session_log_empty": "（暂无回合记录）",
         "turn_label": "回合",
@@ -137,9 +136,9 @@ LABELS: dict[str, dict[str, str]] = {
         "player_inventory": "Inventory",
         "session_log": "Session Log",
         "session_log_window_note": (
-            "Showing detailed backup for the most recent {limit} turns only; older "
-            "full backups remain in `session_log.jsonl`, and compressed memory "
-            "remains in `context_summary.md`."
+            "Showing the detailed recovery window for the most recent {limit} turns "
+            "only; older full records are archived in `session_log.jsonl`, and "
+            "recovery memory remains in `context_summary.md`."
         ),
         "session_log_empty": "(no turns logged yet)",
         "turn_label": "turn",
@@ -391,8 +390,8 @@ def render_session_log(
     """Return (markdown, jsonl) for the session log.
 
     The jsonl is the canonical full archive; the markdown is a detailed
-    recent backup window. Old context should be compressed into
-    context_summary.md instead of repeatedly loaded into the prompt.
+    five-turn recovery window. Older context belongs in
+    context_summary.md instead of the prompt.
     """
     md_lines = [f"# {L['session_log']}", ""]
     visible_entries = save.session_log[-detail_limit:] if detail_limit else save.session_log

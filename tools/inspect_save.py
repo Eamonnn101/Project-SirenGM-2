@@ -8,12 +8,12 @@ The `--save` argument is resolved as `saves_root / <arg>`; the
 canonical layout is `saves/<pack>/<save_id>/`.
 
 Prints turn/day/location/risk, player status, present entities,
-active threads, objectives, open loops (count + titles), last
-narration preview, and divergence count. Output is plain text, one
-save per invocation.
+active threads, objectives, open loops (count + titles), and divergence
+count. Output is plain text, one save per invocation.
 
-With `--active-summary`, prints a legacy compact recovery seed. It is
-for diagnostics or save/load recovery, not the ordinary turn loop.
+With `--active-summary`, prints a compact recovery seed. It does not
+read `session_log.jsonl`; use the rendered `session_log.md` file for
+the latest five detailed turns when recovering from lost context.
 """
 
 from __future__ import annotations
@@ -22,9 +22,6 @@ import argparse
 import sys
 from pathlib import Path
 
-RECENT_TURN_SUMMARY_LIMIT = 140
-RECENT_TURN_INPUT_LIMIT = 60
-
 if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from _hud import hud_labels, render_compact_turn_hud, render_full_build_hud
@@ -32,7 +29,6 @@ if __package__ is None or __package__ == "":
         CONTEXT_SUMMARY_FILENAME,
         CONTEXT_SUMMARY_ACTIVE_PREVIEW_CHARS,
         CONTEXT_SUMMARY_SOFT_CHARS,
-        RECENT_SESSION_LOG_LIMIT,
         _read_pack_language,
         load_meta_progress,
         load_save,
@@ -43,7 +39,6 @@ else:
         CONTEXT_SUMMARY_FILENAME,
         CONTEXT_SUMMARY_ACTIVE_PREVIEW_CHARS,
         CONTEXT_SUMMARY_SOFT_CHARS,
-        RECENT_SESSION_LOG_LIMIT,
         _read_pack_language,
         load_meta_progress,
         load_save,
@@ -154,27 +149,6 @@ def _read_context_summary(save_dir: Path | None) -> str:
     )
 
 
-def _format_recent_turns(session_log) -> str:
-    if not session_log:
-        return "none"
-    parts: list[str] = []
-    for entry in session_log[-RECENT_SESSION_LOG_LIMIT:]:
-        summary = _compact_inline(
-            entry.summary.strip() or entry.narration.strip().splitlines()[0],
-            limit=RECENT_TURN_SUMMARY_LIMIT,
-        )
-        player_input = _compact_inline(entry.player_input, limit=RECENT_TURN_INPUT_LIMIT)
-        parts.append(f"turn {entry.turn}: {summary} (player: {player_input})")
-    return "\n".join(f"- {part}" for part in parts)
-
-
-def _compact_inline(text: str, *, limit: int) -> str:
-    one_line = " ".join(text.strip().split())
-    if len(one_line) <= limit:
-        return one_line
-    return one_line[: limit - 1].rstrip() + "…"
-
-
 def format_active_summary(save, *, save_dir: Path | None = None, language: str | None = None) -> str:
     """Compact recovery seed for diagnostics.
 
@@ -219,8 +193,9 @@ def format_active_summary(save, *, save_dir: Path | None = None, language: str |
         + _join_or_none([f"{loop.id} - {loop.title}" for loop in open_items]),
         "context_summary:",
         _read_context_summary(save_dir),
-        f"recent_turns (last {RECENT_SESSION_LOG_LIMIT}):",
-        _format_recent_turns(save.session_log),
+        "recent_turns:",
+        "read session_log.md for the latest five detailed turns; "
+        "do not read session_log.jsonl unless auditing the archive.",
     ]
     return "\n".join(lines) + "\n"
 
@@ -241,11 +216,11 @@ def main(argv: list[str] | None = None) -> int:
         print(f"error: save dir not found: {save_dir}", file=sys.stderr)
         return 2
     if args.active_summary:
-        save = load_save(save_dir, session_log_limit=RECENT_SESSION_LOG_LIMIT)
+        save = load_save(save_dir, session_log_limit=0)
         language = _read_pack_language(args.packs_root, save.pack_name)
         sys.stdout.write(format_active_summary(save, save_dir=save_dir, language=language))
         return 0
-    save = load_save(save_dir)
+    save = load_save(save_dir, session_log_limit=0)
     language = _read_pack_language(args.packs_root, save.pack_name)
     sys.stdout.write(format_summary(save, save_dir=save_dir, language=language))
     return 0

@@ -121,7 +121,7 @@ Create `saves/<pack>/<save_id>/` and write:
 - `player.json` — duplicate of `world_state.json::player`.
 - `session_log.jsonl` — empty file (`touch` it).
 - `context_summary.md` — empty recovery summary file. It is populated
-  only after a detailed session-log window rolls past 20 turns.
+  once backed-up play has more than five turns.
 - `divergences.jsonl` — empty file.
 
 **Also** update (or create) `saves/<pack>/meta_progress.json`:
