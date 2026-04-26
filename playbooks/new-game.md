@@ -107,7 +107,7 @@ Ask the user to confirm before writing anything.
 
 Create `saves/<pack>/<save_id>/` and write:
 
-- `meta.json` — `{"save_id": "<save_id>", "pack_name": "<pack>", "hidden_truths": ""}`
+- `meta.json` — `{"save_id": "<save_id>", "pack_name": "<pack>", "hidden_truths": "", "context_summary_through_turn": 0}`
 - `world_state.json` — the schema is defined in `tools/_models.py::WorldState`.
   Fields: `turn: 0`, `day: 0`, `time_of_day: "morning"`, `current_location`,
   `present_entities`, `active_threads`, `current_objectives`, `risk_level`,
@@ -120,8 +120,9 @@ Create `saves/<pack>/<save_id>/` and write:
 - `open_loops.json` — `{"items": []}`.
 - `player.json` — duplicate of `world_state.json::player`.
 - `session_log.jsonl` — empty file (`touch` it).
-- `context_summary.md` — empty recovery summary file. It is populated
-  once backed-up play has more than five turns.
+- `context_summary.md` — empty recovery summary file. It receives its
+  first appended segment only after 10+ turns have slid out of the
+  latest 10-turn detail window without summary.
 - `divergences.jsonl` — empty file.
 
 **Also** update (or create) `saves/<pack>/meta_progress.json`:

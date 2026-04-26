@@ -45,7 +45,13 @@ if __package__ is None or __package__ == "":
     )
     from _hud import hud_labels, render_compact_turn_hud
     from lint_pack import load_pack
-    from render_save import _labels_for, _read_pack_language, load_meta_progress, load_save
+    from render_save import (
+        SESSION_LOG_DETAIL_LIMIT,
+        _labels_for,
+        _read_pack_language,
+        load_meta_progress,
+        load_save,
+    )
 else:
     from ._models import (
         DivergenceNote,
@@ -58,7 +64,13 @@ else:
     )
     from ._hud import hud_labels, render_compact_turn_hud
     from .lint_pack import load_pack
-    from .render_save import _labels_for, _read_pack_language, load_meta_progress, load_save
+    from .render_save import (
+        SESSION_LOG_DETAIL_LIMIT,
+        _labels_for,
+        _read_pack_language,
+        load_meta_progress,
+        load_save,
+    )
 
 
 def lint_save(save_dir: Path, *, packs_root: Path | None = None) -> list[str]:
@@ -127,6 +139,40 @@ def lint_save(save_dir: Path, *, packs_root: Path | None = None) -> list[str]:
     # 10. meta_progress.json (optional sibling file).
     issues.extend(_lint_meta_progress(save_dir, save))
 
+    # 11. context_summary cursor consistency.
+    issues.extend(_lint_context_summary(save_dir, save))
+
+    return issues
+
+
+def _lint_context_summary(save_dir: Path, save) -> list[str]:
+    """Cursor in meta.json must agree with session_log length and the on-disk file."""
+    issues: list[str] = []
+    cursor = save.context_summary_through_turn
+    total = len(save.session_log)
+    out_of_window = max(0, total - SESSION_LOG_DETAIL_LIMIT)
+    if cursor > total:
+        issues.append(
+            f"meta.json::context_summary_through_turn={cursor} exceeds "
+            f"session_log length {total}"
+        )
+    elif cursor > out_of_window:
+        issues.append(
+            f"meta.json::context_summary_through_turn={cursor} exceeds the "
+            f"out-of-window boundary ({out_of_window}); the cursor must only "
+            f"cover turns that have slid out of the latest "
+            f"{SESSION_LOG_DETAIL_LIMIT}-turn detail window"
+        )
+    summary_path = save_dir / "context_summary.md"
+    if cursor > 0:
+        if not summary_path.is_file():
+            issues.append(
+                f"context_summary_through_turn={cursor} but context_summary.md is missing"
+            )
+        elif not summary_path.read_text(encoding="utf-8").strip():
+            issues.append(
+                f"context_summary_through_turn={cursor} but context_summary.md is empty"
+            )
     return issues
 
 

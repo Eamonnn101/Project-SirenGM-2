@@ -43,7 +43,7 @@ Use this priority during ordinary play:
 `context_summary.md` and `session_log.md` are recovery surfaces. Read
 them only when switching LLMs, after the model's conversation context is
 lost, or when the user explicitly asks to load/recover from disk. In
-that case, read `context_summary.md` plus the latest five detailed turns
+that case, read `context_summary.md` plus the latest ten detailed turns
 already rendered in `session_log.md`.
 
 Never read `session_log.jsonl` for ordinary play or recovery prompting.
@@ -52,34 +52,49 @@ It is the complete archive for tooling, lint, audit, and replay only.
 ## Backup Policy
 
 There is no fixed every-turn persistence requirement. Ordinary turns can
-advance from conversation context. Write a backup when:
+advance from conversation context. Write a backup only when one of the
+following hard triggers fires:
 
 - the user explicitly asks to save/存档;
-- a durable high-impact event occurs (death, critical health, stage
-  breakthrough, destiny gain/exhaustion, artifact use/exhaustion,
-  conflict resolution, major scene/location transition, major
-  relationship/faction/world-state change, important NPC death/betrayal,
-  run restart, or major source-novel divergence);
-- the agent judges the live state has become too easy to lose.
+- `world_state.json` changes in any of these fields this turn:
+  `risk_level`, `current_location`, `player.stage_index`,
+  `player.health_state`, `player.destiny_traits` (gain or exhausted
+  flip), `player.artifact.used`, `hidden_truths`,
+  `current_conflict` (open or resolve);
+- a relationship's `status` enum changes (numeric `affinity` / `trust`
+  drift alone is **not** a trigger);
+- death, stage breakthrough, artifact use/exhaustion, important NPC
+  death/betrayal, run restart, or major source-novel divergence.
+
+Plain scene transitions, dialogue beats, exploration, and small
+affinity/trust nudges do **not** trigger a backup. When in doubt, skip
+the backup; the next durable event will fold the unsaved beats into one
+write.
 
 Backup writes are for durability only. Do not refresh the prompt from
 the backup after every write.
 
 ## Recovery Memory
 
-`session_log.md` is the detailed five-turn recovery window. It should
+`session_log.md` is the detailed ten-turn recovery window. It should
 render full recent turn details: player input, narration, options, and
 summary.
 
-Simple rule:
+`context_summary.md` is built up **incrementally**, not rewritten:
 
-- If the run has five or fewer backed-up turns, do nothing extra.
-- After that, every backup should rewrite `context_summary.md` as
-  readable key-node memory covering everything before the latest five
-  turns, then render `session_log.md` with only the latest five detailed
-  turns.
-- Keep `context_summary.md` as short prose key nodes. Do not add tables,
-  HUD mirrors, NPC rosters, or current-state lists that duplicate JSON.
+- If `len(session_log)` is at most 10, do nothing extra.
+- Once at least 10 turns have slid out of the window without yet being
+  summarized, the next backup must include a `context_summary_rewrite`
+  whose body is a key-node compression of those specific turns.
+  `checkpoint_save.py` reports the exact turn range; it prepends a
+  `## 回合 N–M` (or `## Turns N–M`) header and a `---` separator and
+  appends the new segment to the file. Existing segments are never
+  edited.
+- Keep each segment short readable prose. Do not duplicate tables, HUD
+  mirrors, NPC rosters, or live-state lists already covered by JSON.
+- A single backup that batches more than 10 turns triggers exactly one
+  segment covering the full out-of-window range; many small backups
+  that accumulate past 10 unsummarized turns also trigger one segment.
 
 The LLM writes the compression text because it requires narrative
 judgment. Tools only persist and render the backup surfaces.
@@ -106,9 +121,12 @@ Use this path when a backup write is needed.
 2. Apply state changes in chronological order. Do not merge multiple
    turns into a final-state blob if intermediate costs/triggers matter.
 3. Append one detailed `SessionLogEntry` per backed-up turn.
-4. If the run has more than five backed-up turns, rewrite
-   `context_summary.md` with readable key-node memory covering the
-   older material before the latest five turns.
+4. If 10 or more unsummarized turns will sit outside the latest 10-turn
+   detail window after this patch, include exactly one
+   `context_summary_rewrite`. Its body should be a short prose
+   compression of the specific turn range the helper indicates; do not
+   restate or edit older segments. Below the threshold, omit
+   `context_summary_rewrite` entirely.
 5. Run the backup helper when possible:
 
    ```bash

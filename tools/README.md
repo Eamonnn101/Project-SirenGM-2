@@ -8,7 +8,7 @@ the agent do them by hand:
 | script | purpose |
 |---|---|
 | `chunker.py` | Split a raw novel text file into chapter-sized chunks under `packs/<pack>/.ingest/chunks.jsonl`. Used by `playbooks/ingest.md`. |
-| `checkpoint_save.py` | Apply a compact backup patch to a save, append detailed session-log entries, keep recovery memory current after the first five turns, and optionally render/lint once at the end. |
+| `checkpoint_save.py` | Apply a compact backup patch to a save, append detailed session-log entries, append a new `context_summary.md` segment whenever 10+ turns have slid out without summary, and optionally render/lint once at the end. |
 | `lint_pack.py` | Rule-based validation of a genre pack (`--genre <name>`) or user pack (`--pack <name>`): required files, schema, cross-refs, orphan wiki-links, bare slugs on non-ASCII-named entities. |
 | `lint_save.py` | Rule-based validation of a save (`--save <pack>/<save_id>`): JSON legality, `turn ≡ len(session_log)`, `player.json ≡ world_state.player`, rendered-surface drift, `hidden_truths` consistency, slug existence against the pack. |
 | `render_save.py` | Re-render every markdown surface of a save (`current_scene.md`, `player.md`, detailed-window `session_log.md`, `hidden_truths.md`) from the canonical JSON state. Full `session_log.jsonl` remains the archive. |
@@ -48,7 +48,7 @@ equivalent.
   `render_pack.py --pack <pack>` and browse `packs/<pack>/_rendered/`.
 - When orienting on an existing save → run `inspect_save.py --save <pack>/<save_id>`.
 - When recovering from disk after losing conversation context → read
-  `context_summary.md` and `session_log.md` (latest five detailed
+  `context_summary.md` and `session_log.md` (latest ten detailed
   turns). Use `inspect_save.py --save <pack>/<save_id>` only as a
   diagnostic seed.
 - At the start of ingest → run `chunker.py <novel> --pack <pack>`.
@@ -58,10 +58,12 @@ equivalent.
 wrapper. Supported keys are `world_state`, `flags_merge`,
 `relationship_updates`, `open_loops_add`, `open_loops_update`,
 `open_loops_close`, `hidden_truths_append`, `session_log_entries`,
-and `context_summary_rewrite`. Once a save has more than five backed-up
-turns, include `context_summary_rewrite` in each patch so the older
-material stays recoverable while `session_log.md` remains a five-turn
-window.
+and `context_summary_rewrite`. The detail window is the latest 10
+turns. When 10+ turns have slid out of that window without summary,
+the next patch must include exactly one `context_summary_rewrite`
+covering the indicated range; the helper appends it as a new segment
+to `context_summary.md`. Below the threshold, omit the field —
+existing segments are never edited.
 
 When the agent should NOT use them:
 - Never substitute `lint_pack.py` output for the agent's own content judgment.

@@ -13,7 +13,7 @@ count. Output is plain text, one save per invocation.
 
 With `--active-summary`, prints a compact recovery seed. It does not
 read `session_log.jsonl`; use the rendered `session_log.md` file for
-the latest five detailed turns when recovering from lost context.
+the latest ten detailed turns when recovering from lost context.
 """
 
 from __future__ import annotations
@@ -194,7 +194,7 @@ def format_active_summary(save, *, save_dir: Path | None = None, language: str |
         "context_summary:",
         _read_context_summary(save_dir),
         "recent_turns:",
-        "read session_log.md for the latest five detailed turns; "
+        "read session_log.md for the latest ten detailed turns; "
         "do not read session_log.jsonl unless auditing the archive.",
     ]
     return "\n".join(lines) + "\n"

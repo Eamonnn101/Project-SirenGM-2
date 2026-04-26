@@ -46,7 +46,7 @@ the model to reread and rewrite the whole project state every time.
   information source.
 - **Recovery memory:** save files are backups. If a new LLM has to
   continue the run or the conversation context is lost, read
-  `context_summary.md` plus the latest five detailed turns in
+  `context_summary.md` plus the latest ten detailed turns in
   `session_log.md`. `session_log.jsonl` is the full archive only.
 - **Immediate backup triggers:** death, critical/dead health, breakthrough,
   destiny gain/exhaustion, artifact use/exhaustion, conflict resolution,
@@ -167,7 +167,7 @@ prompt context while the conversation window still contains the run.
 Rendered markdown files such as `current_scene.md`, `player.md`,
 `session_log.md`, and `hidden_truths.md` are display surfaces. They are
 regenerated from JSON and should never be scraped for canonical state.
-`session_log.md` renders the latest five detailed turns for recovery;
+`session_log.md` renders the latest ten detailed turns for recovery;
 the full archive remains in `session_log.jsonl`.
 
 Ordinary turns should not refresh themselves from save files. Continue
@@ -215,9 +215,12 @@ This preserves ordered effects such as conflict ledgers, survival-trigger
 precedence, stage breakthrough into destiny pick, and session-log turn
 numbers without paying full I/O cost every ordinary turn.
 
-Once the run has more than five backed-up turns, provide
-`context_summary_rewrite` in each backup patch so older material remains
-available as readable key-node memory while `session_log.md` stays small.
+Once 10 or more turns have slid out of the latest 10-turn detail window
+without summary, the next backup must include one
+`context_summary_rewrite` covering the indicated turn range; the helper
+appends it as a new segment to `context_summary.md`. Below the
+threshold, omit the field — segments are added incrementally, never
+rewritten.
 
 ## Core Gameplay Systems
 
@@ -257,8 +260,8 @@ LLM.
 | `python tools/chunker.py <novel> --pack <pack>` | Split source text into ingest chunks. |
 | `python tools/lint_pack.py --pack <pack>` | Validate a generated user pack. |
 | `python tools/lint_pack.py --genre universal` | Validate the shipped universal genre pack. |
-| `python tools/checkpoint_save.py --save <pack>/<save_id> --patch <patch.json> --render --lint` | Apply a compact backup patch, append detailed logs, keep recovery memory current after the first five turns, render, and lint. |
-| `python tools/render_save.py --save <pack>/<save_id>` | Render markdown surfaces from canonical JSON; `session_log.md` is the latest five-turn recovery window. |
+| `python tools/checkpoint_save.py --save <pack>/<save_id> --patch <patch.json> --render --lint` | Apply a compact backup patch, append detailed logs, append a new `context_summary.md` segment when 10+ turns have slid out without summary, render, and lint. |
+| `python tools/render_save.py --save <pack>/<save_id>` | Render markdown surfaces from canonical JSON; `session_log.md` is the latest ten-turn recovery window. |
 | `python tools/lint_save.py --save <pack>/<save_id>` | Validate a backed-up save. |
 | `python tools/inspect_save.py --save <pack>/<save_id>` | Print a compact save summary. |
 
@@ -307,9 +310,10 @@ Important rules:
   source.
 - Added a hard player-facing output ban for kernel/mode/private-note
   leakage.
-- Added recovery-memory backups: `session_log.md` keeps the latest five
+- Added recovery-memory backups: `session_log.md` keeps the latest ten
   detailed turns, `session_log.jsonl` keeps the archive, and
-  `context_summary.md` stores readable key-node memory for recovery.
+  `context_summary.md` stores readable key-node memory for recovery,
+  appended in segments after every 10 turns slide out of the window.
 - Added `checkpoint_save.py` for compact backup patches.
 
 ### v0.5.x

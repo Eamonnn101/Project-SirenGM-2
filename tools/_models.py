@@ -487,6 +487,16 @@ class Save(BaseModel):
     session_log: list[SessionLogEntry] = Field(default_factory=list)
     divergences: list[DivergenceNote] = Field(default_factory=list)
     hidden_truths: str = Field(default="", description="GM-only facts, free-form markdown.")
+    context_summary_through_turn: int = Field(
+        default=0,
+        ge=0,
+        description=(
+            "Highest turn covered by `context_summary.md`. Advances when an "
+            "incremental segment is appended after older turns slide out of "
+            "the session_log detail window. 0 means context_summary.md is "
+            "empty (or has not been written yet)."
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------

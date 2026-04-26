@@ -4,9 +4,14 @@ Usage:
     python tools/checkpoint_save.py --save <pack>/<save_id> --patch /tmp/patch.json --render --lint
 
 The patch is intentionally small. It updates backup JSON, appends
-detailed session-log entries in order, rewrites `context_summary.md`
-whenever backed-up play has more than five turns, and can run render/lint
-once at the end. It does not call an LLM.
+detailed session-log entries in order, and — only when the count of
+turns that have slid out of the session_log detail window without yet
+being summarized reaches `CONTEXT_SUMMARY_BATCH_THRESHOLD` — appends
+one new segment to `context_summary.md`. The cursor of "summarized
+through turn N" is persisted in `meta.json::context_summary_through_turn`.
+A single `context_summary_rewrite` field per patch is allowed; the
+tool prepends a `## 回合/Turns N–M` header and a `---` separator. It
+does not call an LLM.
 """
 
 from __future__ import annotations
@@ -30,6 +35,7 @@ if __package__ is None or __package__ == "":
     )
     from lint_save import lint_save
     from render_save import (
+        CONTEXT_SUMMARY_BATCH_THRESHOLD,
         CONTEXT_SUMMARY_FILENAME,
         SESSION_LOG_DETAIL_LIMIT,
         _read_pack_language,
@@ -48,6 +54,7 @@ else:
     )
     from .lint_save import lint_save
     from .render_save import (
+        CONTEXT_SUMMARY_BATCH_THRESHOLD,
         CONTEXT_SUMMARY_FILENAME,
         SESSION_LOG_DETAIL_LIMIT,
         _read_pack_language,
@@ -92,10 +99,23 @@ def _turn_patches(payload: dict[str, Any]) -> list[dict[str, Any]]:
     return turns
 
 
-def _has_context_rewrite(payload: dict[str, Any], turns: list[dict[str, Any]]) -> bool:
-    return "context_summary_rewrite" in payload or any(
-        "context_summary_rewrite" in turn for turn in turns
-    )
+def _collect_context_rewrites(
+    payload: dict[str, Any], turns: list[dict[str, Any]]
+) -> list[str]:
+    """Return every `context_summary_rewrite` value found in the patch.
+
+    When the payload uses the `{"turns": [...]}` wrapper, both the global
+    payload and the per-turn entries may carry a rewrite. Without the
+    wrapper, `turns == [payload]`, so checking only the per-turn list
+    avoids double-counting.
+    """
+    rewrites: list[str] = []
+    if "turns" in payload and "context_summary_rewrite" in payload:
+        rewrites.append(payload["context_summary_rewrite"])
+    for turn_patch in turns:
+        if "context_summary_rewrite" in turn_patch:
+            rewrites.append(turn_patch["context_summary_rewrite"])
+    return rewrites
 
 
 def _session_entries_count(payload: dict[str, Any], turns: list[dict[str, Any]]) -> int:
@@ -113,8 +133,25 @@ def _session_entries_count(payload: dict[str, Any], turns: list[dict[str, Any]])
     return count
 
 
-def _needs_context_rewrite(added_entries: int, new_count: int) -> bool:
-    return added_entries > 0 and new_count > SESSION_LOG_DETAIL_LIMIT
+def _pending_summary_range(
+    save: Save, added_entries: int
+) -> tuple[int, int]:
+    """Compute the inclusive turn range that should be summarized next.
+
+    Returns `(start, end)` where the new context_summary segment must
+    cover turns `start..end`. When `start > end` no append is owed.
+    """
+    new_total = len(save.session_log) + added_entries
+    out_of_window_end = max(0, new_total - SESSION_LOG_DETAIL_LIMIT)
+    start = save.context_summary_through_turn + 1
+    return start, out_of_window_end
+
+
+def _needs_context_append(save: Save, added_entries: int) -> bool:
+    start, end = _pending_summary_range(save, added_entries)
+    if start > end:
+        return False
+    return (end - start + 1) >= CONTEXT_SUMMARY_BATCH_THRESHOLD
 
 
 def _validate_patch_keys(patch: dict[str, Any]) -> None:
@@ -255,16 +292,38 @@ def _append_session_entries(save: Save, rows: Any) -> set[str]:
     return {"world_state", "session_log"}
 
 
-def _write_context_summary(save_dir: Path, patch: dict[str, Any]) -> set[str]:
-    changed: set[str] = set()
+def _segment_header(language: str | None, start_turn: int, end_turn: int) -> str:
+    label = "Turns" if language == "en" else "回合"
+    if start_turn == end_turn:
+        return f"## {label} {start_turn}"
+    return f"## {label} {start_turn}–{end_turn}"
+
+
+def _append_context_summary(
+    save_dir: Path,
+    body: str,
+    *,
+    start_turn: int,
+    end_turn: int,
+    language: str | None,
+) -> set[str]:
+    if not isinstance(body, str):
+        raise ValueError("context_summary_rewrite must be a string")
+    stripped = body.strip()
+    if not stripped:
+        raise ValueError("context_summary_rewrite must be a non-empty string")
     path = save_dir / CONTEXT_SUMMARY_FILENAME
-    if "context_summary_rewrite" in patch:
-        value = patch["context_summary_rewrite"]
-        if not isinstance(value, str):
-            raise ValueError("context_summary_rewrite must be a string")
-        path.write_text(value.strip() + "\n", encoding="utf-8")
-        changed.add(CONTEXT_SUMMARY_FILENAME)
-    return changed
+    header = _segment_header(language, start_turn, end_turn)
+    new_segment = f"{header}\n\n{stripped}\n"
+    if path.is_file():
+        existing = path.read_text(encoding="utf-8").rstrip()
+    else:
+        existing = ""
+    if existing:
+        path.write_text(existing + "\n\n---\n\n" + new_segment, encoding="utf-8")
+    else:
+        path.write_text(new_segment, encoding="utf-8")
+    return {CONTEXT_SUMMARY_FILENAME}
 
 
 def _apply_one_patch(save: Save, patch: dict[str, Any]) -> set[str]:
@@ -303,6 +362,7 @@ def _write_save(save_dir: Path, save: Save) -> None:
             "save_id": save.save_id,
             "pack_name": save.pack_name,
             "hidden_truths": save.hidden_truths,
+            "context_summary_through_turn": save.context_summary_through_turn,
         },
     )
     _dump_json(save_dir / "world_state.json", save.world.model_dump(mode="json"))
@@ -331,24 +391,39 @@ def apply_checkpoint_patch(
     turns = _turn_patches(payload)
     save = load_save(save_dir)
     added_entries = _session_entries_count(payload, turns)
-    new_count = len(save.session_log) + added_entries
-    if _needs_context_rewrite(added_entries, new_count):
-        if not _has_context_rewrite(payload, turns):
+
+    rewrites = _collect_context_rewrites(payload, turns)
+    if len(rewrites) > 1:
+        return (
+            1,
+            ["error: at most one context_summary_rewrite is allowed per patch"],
+        )
+
+    must_append = _needs_context_append(save, added_entries)
+    if must_append and not rewrites:
+        start, end = _pending_summary_range(save, added_entries)
+        return (
+            1,
+            [
+                f"error: {end - start + 1} turns have slid out of the latest "
+                f"{SESSION_LOG_DETAIL_LIMIT}-turn window without summary; "
+                f"include a context_summary_rewrite covering turns {start}–{end}"
+            ],
+        )
+
+    if rewrites:
+        start, end = _pending_summary_range(save, added_entries)
+        if start > end:
             return (
                 1,
                 [
-                    "error: backups beyond the latest "
-                    f"{SESSION_LOG_DETAIL_LIMIT} turns require "
-                    f"context_summary_rewrite before archiving turn {new_count}"
+                    "error: context_summary_rewrite provided but no turns "
+                    "have slid out of the detail window yet"
                 ],
             )
 
     changed: set[str] = set()
-    context_patches: list[dict[str, Any]] = []
     for turn_patch in turns:
-        context_patches.append(
-            {key: turn_patch[key] for key in CONTEXT_PATCH_KEYS if key in turn_patch}
-        )
         state_patch = {
             key: value
             for key, value in turn_patch.items()
@@ -357,27 +432,28 @@ def apply_checkpoint_patch(
         if state_patch:
             changed |= _apply_one_patch(save, state_patch)
     if "turns" in payload:
-        global_patch = {key: payload[key] for key in PATCH_KEYS if key in payload}
+        global_patch = {
+            key: value
+            for key, value in payload.items()
+            if key in PATCH_KEYS and key not in CONTEXT_PATCH_KEYS
+        }
         if global_patch:
-            context_patches.append(
-                {
-                    key: global_patch[key]
-                    for key in CONTEXT_PATCH_KEYS
-                    if key in global_patch
-                }
-            )
-            state_patch = {
-                key: value
-                for key, value in global_patch.items()
-                if key not in CONTEXT_PATCH_KEYS
-            }
-            if state_patch:
-                changed |= _apply_one_patch(save, state_patch)
+            changed |= _apply_one_patch(save, global_patch)
+
+    if rewrites:
+        start = save.context_summary_through_turn + 1
+        end = max(0, len(save.session_log) - SESSION_LOG_DETAIL_LIMIT)
+        language = _read_pack_language(packs_root, save.pack_name)
+        changed |= _append_context_summary(
+            save_dir,
+            rewrites[0],
+            start_turn=start,
+            end_turn=end,
+            language=language,
+        )
+        save.context_summary_through_turn = end
 
     _write_save(save_dir, save)
-    for context_patch in context_patches:
-        if context_patch:
-            changed |= _write_context_summary(save_dir, context_patch)
     messages = [
         "backup applied: "
         + (", ".join(sorted(changed)) if changed else "no state changes")

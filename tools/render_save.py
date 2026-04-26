@@ -12,8 +12,9 @@ Reads the authoritative JSON files under the save dir
 `meta.json`, `session_log.jsonl`, `divergences.jsonl`) and overwrites
 the markdown surfaces (`current_scene.md`, `player.md`,
 `session_log.md`, `hidden_truths.md`) plus `session_log.jsonl`
-re-normalized. `session_log.md` renders a detailed recent backup
-window; `session_log.jsonl` remains the complete archive.
+re-normalized. `session_log.md` renders the detailed recovery window
+(latest `SESSION_LOG_DETAIL_LIMIT` turns); `session_log.jsonl` remains
+the complete archive.
 
 Labels in the rendered surfaces are picked from a per-language dictionary
 keyed by the pack's declared `language` (from `packs/<pack>/index.md`).
@@ -73,7 +74,12 @@ else:
 CONTEXT_SUMMARY_FILENAME = "context_summary.md"
 CONTEXT_SUMMARY_SOFT_CHARS = 2_200
 CONTEXT_SUMMARY_ACTIVE_PREVIEW_CHARS = 1_000
-SESSION_LOG_DETAIL_LIMIT = 5
+SESSION_LOG_DETAIL_LIMIT = 10
+# An incremental context_summary.md segment is required only once
+# `(unsummarized turns outside the detail window) >= this threshold`,
+# so a single backup carrying many turns or a series of small backups
+# that accumulate past the bar both trigger one append.
+CONTEXT_SUMMARY_BATCH_THRESHOLD = 10
 
 LABELS: dict[str, dict[str, str]] = {
     "zh": {
@@ -95,7 +101,7 @@ LABELS: dict[str, dict[str, str]] = {
         "session_log": "本局日志",
         "session_log_window_note": (
             "仅显示最近 {limit} 回合的详细恢复窗口；更早完整记录仅归档在 "
-            "`session_log.jsonl`，恢复记忆保留在 `context_summary.md`。"
+            "`session_log.jsonl`，恢复记忆按段追加在 `context_summary.md`。"
         ),
         "session_log_empty": "（暂无回合记录）",
         "turn_label": "回合",
@@ -138,7 +144,7 @@ LABELS: dict[str, dict[str, str]] = {
         "session_log_window_note": (
             "Showing the detailed recovery window for the most recent {limit} turns "
             "only; older full records are archived in `session_log.jsonl`, and "
-            "recovery memory remains in `context_summary.md`."
+            "recovery memory is appended in segments to `context_summary.md`."
         ),
         "session_log_empty": "(no turns logged yet)",
         "turn_label": "turn",
@@ -232,6 +238,7 @@ def load_save(save_dir: Path, *, session_log_limit: int | None = None) -> Save:
         session_log=session_log,
         divergences=divergences,
         hidden_truths=meta.get("hidden_truths", ""),
+        context_summary_through_turn=int(meta.get("context_summary_through_turn", 0)),
     )
 
 
@@ -390,8 +397,8 @@ def render_session_log(
     """Return (markdown, jsonl) for the session log.
 
     The jsonl is the canonical full archive; the markdown is a detailed
-    five-turn recovery window. Older context belongs in
-    context_summary.md instead of the prompt.
+    recovery window of the latest `detail_limit` turns. Older context
+    is appended in segments to `context_summary.md` instead.
     """
     md_lines = [f"# {L['session_log']}", ""]
     visible_entries = save.session_log[-detail_limit:] if detail_limit else save.session_log

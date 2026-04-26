@@ -445,7 +445,9 @@ When sources disagree, follow this order:
 5. **Recovery memory** — `context_summary.md` and `session_log.md` are
    backup/recovery surfaces. Read them only after switching LLMs, losing
    conversation context, or receiving an explicit load/recovery request.
-   `session_log.md` contains the latest five detailed turns.
+   `session_log.md` contains the latest ten detailed turns;
+   `context_summary.md` is built up incrementally, one segment per
+   batch of 10 turns that slide out of the window.
    `session_log.jsonl` is the complete archive only; never read it into
    the prompt to continue play.
 
