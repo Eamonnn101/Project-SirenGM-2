@@ -8,11 +8,12 @@ the agent do them by hand:
 | script | purpose |
 |---|---|
 | `chunker.py` | Split a raw novel text file into chapter-sized chunks under `packs/<pack>/.ingest/chunks.jsonl`. Used by `playbooks/ingest.md`. |
+| `checkpoint_save.py` | Apply a compact checkpoint patch to a save, append session-log entries, maintain `context_summary.md`, and optionally render/lint once at the end. |
 | `lint_pack.py` | Rule-based validation of a genre pack (`--genre <name>`) or user pack (`--pack <name>`): required files, schema, cross-refs, orphan wiki-links, bare slugs on non-ASCII-named entities. |
 | `lint_save.py` | Rule-based validation of a save (`--save <pack>/<save_id>`): JSON legality, `turn ≡ len(session_log)`, `player.json ≡ world_state.player`, rendered-surface drift, `hidden_truths` consistency, slug existence against the pack. |
-| `render_save.py` | Re-render every markdown surface of a save (`current_scene.md`, `player.md`, recent-window `session_log.md`, `hidden_truths.md`) from the canonical JSON state. Full `session_log.jsonl` remains the archive. |
+| `render_save.py` | Re-render every markdown surface of a save (`current_scene.md`, `player.md`, lightweight-index `session_log.md`, `hidden_truths.md`) from the canonical JSON state. Full `session_log.jsonl` remains the archive. |
 | `render_pack.py` | Expand the pack's `[[slug\|Display]]` wiki-links into plain Markdown links under `packs/<pack>/_rendered/` so the pack reads in any Markdown viewer. Canonical pages are left untouched. |
-| `inspect_save.py` | One-screen plain-text summary of a save's state. `--active-summary` prints context summary + recent turns + compact checkpoint seed. Read-only. |
+| `inspect_save.py` | One-screen plain-text summary of a save's state. `--active-summary` prints bounded context summary + recent JSONL tail + compact checkpoint seed. Read-only. |
 
 Saves live at `saves/<pack>/<save_id>/`, so the canonical `--save`
 argument is `<pack>/<save_id>` (e.g. `mypack/save_001`). The `--save`
@@ -39,7 +40,9 @@ equivalent.
 
 ## When the agent should use them
 
-- After writing checkpoint JSON → run `render_save.py`, then `lint_save.py`.
+- For checkpoint persistence → prefer
+  `checkpoint_save.py --save <pack>/<save_id> --patch <patch.json> --render --lint`.
+- After manual checkpoint JSON edits → run `render_save.py`, then `lint_save.py`.
 - After drafting pack pages in ingest → run `lint_pack.py --pack <pack>`.
 - When you want to read a pack's pages in a non-wikilink editor → run
   `render_pack.py --pack <pack>` and browse `packs/<pack>/_rendered/`.
@@ -48,6 +51,14 @@ equivalent.
   `inspect_save.py --save <pack>/<save_id> --active-summary`.
 - At the start of ingest → run `chunker.py <novel> --pack <pack>`.
 - Before relying on any save (e.g. for a save/load check) → run `lint_save.py --save <pack>/<save_id>`.
+
+`checkpoint_save.py` accepts either one patch object or a `{"turns": [...]}`
+wrapper. Supported keys are `world_state`, `flags_merge`,
+`relationship_updates`, `open_loops_add`, `open_loops_update`,
+`open_loops_close`, `hidden_truths_append`, `session_log_entries`,
+`context_node`, and `context_summary_rewrite`. If `context_summary.md`
+is already over the soft size limit, provide `context_summary_rewrite`
+before appending more `context_node` text.
 
 When the agent should NOT use them:
 - Never substitute `lint_pack.py` output for the agent's own content judgment.

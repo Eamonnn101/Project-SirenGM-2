@@ -12,8 +12,8 @@ Reads the authoritative JSON files under the save dir
 `meta.json`, `session_log.jsonl`, `divergences.jsonl`) and overwrites
 the markdown surfaces (`current_scene.md`, `player.md`,
 `session_log.md`, `hidden_truths.md`) plus `session_log.jsonl`
-re-normalized. `session_log.md` intentionally renders only a recent
-window; `session_log.jsonl` remains the complete archive.
+re-normalized. `session_log.md` intentionally renders a lightweight
+full-run index; `session_log.jsonl` remains the complete archive.
 
 Labels in the rendered surfaces are picked from a per-language dictionary
 keyed by the pack's declared `language` (from `packs/<pack>/index.md`).
@@ -72,8 +72,9 @@ else:
 
 CONTEXT_SUMMARY_FILENAME = "context_summary.md"
 RECENT_SESSION_LOG_LIMIT = 3
-CONTEXT_SUMMARY_UPDATE_BYTES = 20_000
-CONTEXT_SUMMARY_UPDATE_TURNS = 20
+CONTEXT_SUMMARY_SOFT_CHARS = 2_200
+CONTEXT_SUMMARY_ACTIVE_PREVIEW_CHARS = 1_000
+SESSION_LOG_INDEX_TEXT_LIMIT = 120
 
 LABELS: dict[str, dict[str, str]] = {
     "zh": {
@@ -93,11 +94,14 @@ LABELS: dict[str, dict[str, str]] = {
         "player_titles": "称号",
         "player_inventory": "物品",
         "session_log": "本局日志",
-        "session_log_recent_note": (
-            "仅显示最近 {limit} 回合；完整归档保留在 `session_log.jsonl`。"
+        "session_log_index_note": (
+            "轻量索引：每回合只显示玩家输入短摘和摘要；完整叙事与选项保留在 "
+            "`session_log.jsonl`。普通游玩不要读取完整 JSONL。"
         ),
+        "session_log_empty": "（暂无回合记录）",
         "turn_label": "回合",
         "player_input": "玩家",
+        "summary": "摘要",
         "options": "选项",
         "hidden_truths": "暗线",
         "hidden_truths_empty": "（暂无）",
@@ -132,11 +136,15 @@ LABELS: dict[str, dict[str, str]] = {
         "player_titles": "Titles",
         "player_inventory": "Inventory",
         "session_log": "Session Log",
-        "session_log_recent_note": (
-            "Showing the most recent {limit} turns only; full archive remains in `session_log.jsonl`."
+        "session_log_index_note": (
+            "Lightweight index: each turn shows only a short player input and summary; "
+            "full narration and options remain in `session_log.jsonl`. Do not read the "
+            "full JSONL during ordinary play."
         ),
+        "session_log_empty": "(no turns logged yet)",
         "turn_label": "turn",
         "player_input": "Player",
+        "summary": "Summary",
         "options": "Options",
         "hidden_truths": "Hidden Truths",
         "hidden_truths_empty": "(empty)",
@@ -377,47 +385,44 @@ def render_player_md(
 def render_session_log(
     save: Save,
     L: dict[str, str],
-    *,
-    recent_limit: int = RECENT_SESSION_LOG_LIMIT,
 ) -> tuple[str, str]:
     """Return (markdown, jsonl) for the session log.
 
     The jsonl is the canonical full archive; the markdown is a compact
-    human-readable recent window so agents do not accidentally ingest a
-    long run's entire history.
+    full-run index so agents can orient by turn number without ingesting
+    a long run's full narration.
     """
     md_lines = [f"# {L['session_log']}", ""]
-    visible_entries = save.session_log[-recent_limit:] if recent_limit else save.session_log
-    if recent_limit and len(save.session_log) > recent_limit:
-        md_lines.append(
-            "> _"
-            + L["session_log_recent_note"].format(limit=recent_limit)
-            + "_"
-        )
+    md_lines.append("> _" + L["session_log_index_note"] + "_")
+    md_lines.append("")
+    if not save.session_log:
+        md_lines.append(f"_{L['session_log_empty']}_")
         md_lines.append("")
     jsonl_lines: list[str] = []
-    for entry in visible_entries:
-        md_lines.append(f"## {L['turn_label']} {entry.turn} · {entry.at.isoformat(timespec='seconds')}")
-        md_lines.append("")
-        md_lines.append(f"**{L['player_input']}**: " + entry.player_input.strip())
-        md_lines.append("")
-        md_lines.append(entry.narration.strip())
-        if entry.options:
-            md_lines.append("")
-            md_lines.append(f"**{L['options']}**")
-            md_lines.append("")
-            for opt in entry.options:
-                md_lines.append(f"- {opt.strip()}")
-        if entry.summary:
-            md_lines.append("")
-            md_lines.append(f"> _{entry.summary}_")
-        md_lines.append("")
+    for entry in save.session_log:
+        player_input = _compact_inline(entry.player_input)
+        summary = entry.summary.strip() or entry.narration.strip().splitlines()[0]
+        summary = _compact_inline(summary)
+        md_lines.append(
+            f"- **{L['turn_label']} {entry.turn}** · "
+            f"{L['player_input']}: {player_input} · "
+            f"{L['summary']}: {summary}"
+        )
     for entry in save.session_log:
         jsonl_lines.append(_entry_to_json(entry))
     return (
         "\n".join(md_lines).rstrip() + "\n",
         "\n".join(jsonl_lines) + ("\n" if jsonl_lines else ""),
     )
+
+
+def _compact_inline(text: str, *, limit: int = SESSION_LOG_INDEX_TEXT_LIMIT) -> str:
+    one_line = " ".join(text.strip().split())
+    if not one_line:
+        return "—"
+    if len(one_line) <= limit:
+        return one_line
+    return one_line[: limit - 1].rstrip() + "…"
 
 
 def _entry_to_json(entry: SessionLogEntry) -> str:

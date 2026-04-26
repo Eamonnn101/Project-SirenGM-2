@@ -13,9 +13,9 @@ narration preview, and divergence count. Output is plain text, one
 save per invocation.
 
 With `--active-summary`, prints a smaller checkpoint seed for the
-agent's in-conversation active state. It includes the save's compressed
-context summary and only the recent session-log window; the full
-session-log archive is not loaded for ordinary-turn context.
+agent's in-conversation active state. It includes bounded compressed
+context memory and only the recent JSONL tail; the full session-log
+archive is not loaded for ordinary-turn context.
 """
 
 from __future__ import annotations
@@ -24,11 +24,16 @@ import argparse
 import sys
 from pathlib import Path
 
+RECENT_TURN_SUMMARY_LIMIT = 140
+RECENT_TURN_INPUT_LIMIT = 60
+
 if __package__ is None or __package__ == "":
     sys.path.insert(0, str(Path(__file__).resolve().parent))
     from _hud import hud_labels, render_compact_turn_hud, render_full_build_hud
     from render_save import (
         CONTEXT_SUMMARY_FILENAME,
+        CONTEXT_SUMMARY_ACTIVE_PREVIEW_CHARS,
+        CONTEXT_SUMMARY_SOFT_CHARS,
         RECENT_SESSION_LOG_LIMIT,
         _read_pack_language,
         load_meta_progress,
@@ -38,6 +43,8 @@ else:
     from ._hud import hud_labels, render_compact_turn_hud, render_full_build_hud
     from .render_save import (
         CONTEXT_SUMMARY_FILENAME,
+        CONTEXT_SUMMARY_ACTIVE_PREVIEW_CHARS,
+        CONTEXT_SUMMARY_SOFT_CHARS,
         RECENT_SESSION_LOG_LIMIT,
         _read_pack_language,
         load_meta_progress,
@@ -133,7 +140,20 @@ def _read_context_summary(save_dir: Path | None) -> str:
     if not path.is_file():
         return "(missing; create or update at the next checkpoint)"
     text = path.read_text(encoding="utf-8").strip()
-    return text if text else "(empty; update at the next checkpoint)"
+    if not text:
+        return "(empty; update at the next checkpoint)"
+    if len(text) <= CONTEXT_SUMMARY_SOFT_CHARS:
+        return text
+    preview = text[:CONTEXT_SUMMARY_ACTIVE_PREVIEW_CHARS].rstrip()
+    return (
+        preview
+        + "\n"
+        + (
+            f"(context_summary is {len(text)} chars; exceeds "
+            f"{CONTEXT_SUMMARY_SOFT_CHARS}. 需在下一次 checkpoint 先压缩旧关键节点，"
+            "再追加新关键节点。)"
+        )
+    )
 
 
 def _format_recent_turns(session_log) -> str:
@@ -141,10 +161,20 @@ def _format_recent_turns(session_log) -> str:
         return "none"
     parts: list[str] = []
     for entry in session_log[-RECENT_SESSION_LOG_LIMIT:]:
-        summary = entry.summary.strip() or entry.narration.strip().splitlines()[0]
-        player_input = entry.player_input.strip()
+        summary = _compact_inline(
+            entry.summary.strip() or entry.narration.strip().splitlines()[0],
+            limit=RECENT_TURN_SUMMARY_LIMIT,
+        )
+        player_input = _compact_inline(entry.player_input, limit=RECENT_TURN_INPUT_LIMIT)
         parts.append(f"turn {entry.turn}: {summary} (player: {player_input})")
     return "\n".join(f"- {part}" for part in parts)
+
+
+def _compact_inline(text: str, *, limit: int) -> str:
+    one_line = " ".join(text.strip().split())
+    if len(one_line) <= limit:
+        return one_line
+    return one_line[: limit - 1].rstrip() + "…"
 
 
 def format_active_summary(save, *, save_dir: Path | None = None, language: str | None = None) -> str:

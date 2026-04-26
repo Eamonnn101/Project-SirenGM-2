@@ -32,9 +32,10 @@ Use three layers during play:
 
 - **Checkpoint state** — canonical files under
   `saves/<pack>/<save_id>/`. JSON wins over prose whenever they differ.
-- **Context Summary** — `context_summary.md`, a compact memory of the
-  run so far. It is the long-run narrative context; full session logs are
-  archive only.
+- **Context Summary** — `context_summary.md`, a compact key-node memory
+  of the run so far. It uses a title plus `**节点（回合范围）**：叙述`
+  paragraphs. Do not turn it into a status table, NPC table, or mini
+  wiki; canonical JSON and the active summary carry those facts.
 - **Active State Summary** — compact in-conversation snapshot seeded
   by `python tools/inspect_save.py --save <pack>/<save_id>
   --active-summary` when play starts/resumes or after each checkpoint.
@@ -126,9 +127,11 @@ Copy the resulting active-state summary into the conversation. This
 summary includes the compact context summary and recent turn summaries;
 it is the default context for ordinary turns.
 
-Never read the full `session_log.jsonl` or `session_log.md` for ordinary
-play context. `session_log.jsonl` is the complete archive, not the
-prompt context. `session_log.md` is a recent-window display surface.
+Never read the full `session_log.jsonl` for ordinary play context.
+`session_log.jsonl` is the complete archive, not prompt context. If
+older turn lookup is necessary, read `session_log.md` only as a
+lightweight all-turn index: it contains turn number, player-input short
+text, and one-line summary, not full narration/options.
 
 ### Ordinary Turn
 
@@ -190,38 +193,37 @@ the agent judges that accumulated private notes should become durable.
    `SessionLogEntry`, then move to the next noted turn. This preserves
    conflict costs, survival-trigger `prior_health_state`, stage →
    destiny sequencing, and session-log turn numbers.
-3. Use the existing patch vocabulary for each noted turn:
+3. Prefer the deterministic checkpoint helper over hand-writing full
+   JSON files. Prepare a small patch JSON under `/tmp/` with the existing
+   patch vocabulary:
    `world_state`, `present_entities_*`, `active_threads_*`,
    `objectives_*`, `relationship_updates`, `open_loops_*`,
    `inventory_*`, `hidden_truths_append`, `conflict_open`,
    `conflict_update`, `conflict_resolve`, `player_health_state`,
    `player_stage_advance`, `player_destiny_trait_add`,
    `player_trait_exhaust`, and `divergence`.
+   The helper directly supports `world_state`, `flags_merge`,
+   `relationship_updates`, `open_loops_add`, `open_loops_update`,
+   `open_loops_close`, `hidden_truths_append`, `session_log_entries`,
+   `context_node`, and `context_summary_rewrite`; use manual JSON edits
+   only for exceptional patch kinds not yet covered by the helper.
 4. Validate each turn patch against `tools/_models.py` before applying
    the next one. Drop invalid sub-patches and append `DivergenceNote`
    entries rather than overwriting broken state with guesses.
-5. Persist after every noted turn has been applied:
-   - `world_state.json` with `turn` advanced once per noted turn;
-   - `relationship_state.json`;
-   - `open_loops.json`;
-   - `player.json` mirrored from `world_state.player`;
-   - one `session_log.jsonl` entry per noted turn;
-   - `meta.json::hidden_truths` and `divergences.jsonl` as needed.
-6. Update `context_summary.md` when the log is large enough to matter:
-   if `session_log.jsonl` is over 20 KB, or the run has reached 20+
-   turns, rewrite the summary before rendering. Keep it around 1200–1800
-   zh characters or 900 en words. It should cover compressed plot
-   memory, important facts, NPC/relationship changes, unresolved hooks,
-   promises/deadlines, current location, and near-term intent. If an old
-   save has no `context_summary.md`, create it at the next checkpoint.
-7. After that, render/lint only once after every noted turn has been applied:
+5. Maintain `context_summary.md` by key nodes, not by fixed word count:
+   - if a checkpoint contains a durable story beat, append one
+     `context_node` such as `**嘉兴之行（29–45 回）**：...`;
+   - if the summary is already over about 2200 characters, first provide
+     `context_summary_rewrite` that compresses older nodes into broader
+     ranges, then append the new node;
+   - if there is no meaningful key node, leave the summary unchanged.
+6. Apply the checkpoint patch, render, and lint once:
 
    ```bash
-   python tools/render_save.py --save <pack>/<save_id>
-   python tools/lint_save.py --save <pack>/<save_id>
+   python tools/checkpoint_save.py --save <pack>/<save_id> --patch /tmp/<patch>.json --render --lint
    ```
 
-8. If lint exits 1, fix before replying. If lint exits 0, refresh the
+7. If lint exits 1, fix before replying. If lint exits 0, refresh the
    active summary with `inspect_save.py --active-summary`, clear the
    private notes, and reply to the user.
 
@@ -298,6 +300,7 @@ every ordinary turn.
   JSON wins. Rebuild the active summary from disk and discard stale
   private notes.
 - If `context_summary.md` is missing on a long-running save, do not read
-  the full session log into the prompt to compensate. Use the canonical
-  state plus recent 3 turns, then create the summary at the next
-  checkpoint.
+  the full JSONL archive into the prompt to compensate. Use canonical
+  state, the active summary, and the lightweight `session_log.md` index
+  only for locating older turns, then create or repair the summary at
+  the next checkpoint.

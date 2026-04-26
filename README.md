@@ -44,9 +44,12 @@ the model to reread and rewrite the whole project state every time.
   compact active-state summary, and private turn notes. Full JSON
   writes, markdown render, and save lint happen only when a checkpoint
   is actually useful or mandatory.
-- **Context compression:** long runs keep the full `session_log.jsonl`
-  archive, but ordinary play uses `context_summary.md` plus the recent
-  3-turn window so prompt size does not grow with every turn.
+- **Key-node memory:** long runs keep the full `session_log.jsonl`
+  archive, but ordinary play uses `context_summary.md` as a compact
+  key-node memory plus a bounded active summary.
+- **Lightweight log index:** `session_log.md` now lists every turn as a
+  one-line index only. Full narration/options stay in JSONL so older
+  turn lookup does not tempt the model to ingest the whole archive.
 - **Immediate checkpoints:** death, critical/dead health, breakthrough,
   destiny gain/exhaustion, artifact use/exhaustion, conflict resolution,
   major scene/world/faction change, important NPC death or betrayal,
@@ -163,13 +166,15 @@ Structured JSON is authoritative at checkpoints:
 - `divergences.jsonl`
 
 `context_summary.md` is durable compressed memory for long runs. It is
-used for prompt context, but canonical JSON wins if they disagree.
+maintained as key-node paragraphs such as
+`**嘉兴之行（29–45 回）**：...`, not as a HUD, NPC table, or mini wiki.
+It is used for prompt context, but canonical JSON wins if they disagree.
 
 Rendered markdown files such as `current_scene.md`, `player.md`,
 `session_log.md`, and `hidden_truths.md` are display surfaces. They are
 regenerated from JSON and should never be scraped for canonical state.
-`session_log.md` shows only a recent window; the full archive remains in
-`session_log.jsonl`.
+`session_log.md` is a lightweight all-turn index; the full archive
+remains in `session_log.jsonl`.
 
 Between checkpoints, ordinary turns may carry compact private turn notes
 inside the conversation. These notes are never part of the player-facing
@@ -202,12 +207,11 @@ The agent applies noted turns in chronological order:
 4. append that turn's session-log entry;
 5. move to the next noted turn.
 
-After every noted turn has been applied, the agent renders and lints
-once:
+After every noted turn has been prepared, the agent should prefer the
+checkpoint helper and render/lint once:
 
 ```bash
-python tools/render_save.py --save <pack>/<save_id>
-python tools/lint_save.py --save <pack>/<save_id>
+python tools/checkpoint_save.py --save <pack>/<save_id> --patch /tmp/<patch>.json --render --lint
 python tools/inspect_save.py --save <pack>/<save_id> --active-summary
 ```
 
@@ -215,9 +219,11 @@ This preserves ordered effects such as conflict ledgers, survival-trigger
 precedence, stage breakthrough into destiny pick, and session-log turn
 numbers without paying full I/O cost every ordinary turn.
 
-For long runs, checkpoint also updates `context_summary.md` when the log
-passes 20 KB or 20 turns. That summary carries old story context forward
-so the LLM does not need to read the complete session archive.
+For long runs, checkpoint appends a `context_node` only when a durable
+story beat occurs. If `context_summary.md` grows past roughly 2200
+characters, compress older nodes into broader ranges before appending
+new ones. The LLM should never read the complete session archive for
+ordinary play.
 
 ## Core Gameplay Systems
 
@@ -257,10 +263,11 @@ LLM.
 | `python tools/chunker.py <novel> --pack <pack>` | Split source text into ingest chunks. |
 | `python tools/lint_pack.py --pack <pack>` | Validate a generated user pack. |
 | `python tools/lint_pack.py --genre universal` | Validate the shipped universal genre pack. |
-| `python tools/render_save.py --save <pack>/<save_id>` | Render markdown surfaces from canonical JSON; `session_log.md` shows only recent turns. |
+| `python tools/checkpoint_save.py --save <pack>/<save_id> --patch <patch.json> --render --lint` | Apply a compact checkpoint patch, append logs, maintain context summary, render, and lint. |
+| `python tools/render_save.py --save <pack>/<save_id>` | Render markdown surfaces from canonical JSON; `session_log.md` is a lightweight all-turn index. |
 | `python tools/lint_save.py --save <pack>/<save_id>` | Validate a checkpointed save. |
 | `python tools/inspect_save.py --save <pack>/<save_id>` | Print a compact save summary. |
-| `python tools/inspect_save.py --save <pack>/<save_id> --active-summary` | Print context summary, recent turns, and the active-state seed. |
+| `python tools/inspect_save.py --save <pack>/<save_id> --active-summary` | Print bounded context memory, recent JSONL tail, and the active-state seed. |
 
 Optional local setup:
 
@@ -310,6 +317,8 @@ Important rules:
   checkpoints instead of every turn.
 - Added context-summary compression so long session logs stay archived
   without becoming ordinary-turn prompt context.
+- Changed `session_log.md` to a lightweight all-turn index and added
+  `checkpoint_save.py` for compact checkpoint patches.
 
 ### v0.5.x
 

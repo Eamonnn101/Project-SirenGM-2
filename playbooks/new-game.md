@@ -120,9 +120,9 @@ Create `saves/<pack>/<save_id>/` and write:
 - `open_loops.json` — `{"items": []}`.
 - `player.json` — duplicate of `world_state.json::player`.
 - `session_log.jsonl` — empty file (`touch` it).
-- `context_summary.md` — initial compact memory, e.g. `# Context Summary`
-  followed by "New run; no prior scene memory yet." in the pack's
-  language.
+- `context_summary.md` — initial key-node memory in the pack's language,
+  e.g. `## 关键经过` followed by
+  `**开局（0 回）**：新局开始，尚无长期剧情记忆。`
 - `divergences.jsonl` — empty file.
 
 **Also** update (or create) `saves/<pack>/meta_progress.json`:
