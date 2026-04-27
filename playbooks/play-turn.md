@@ -26,28 +26,13 @@ pending state, JSON patches, or tool commands in the chat reply.
 
 ## Context Sources
 
-Use this priority during ordinary play:
-
-1. **Live conversation** — the current scene, unresolved consequences,
-   provisional state, and the player's latest input.
-2. **User pack** — `packs/<pack>/novel_rules.md`,
-   `progression_rules.md`, `canon_guardrails.md`, and current entity
-   pages. This is the main external information source.
-3. **Universal rules** — the Core Play Kernel and triggered universal
-   systems.
-4. **Save backup** — JSON/markdown under `saves/<pack>/<save_id>/`,
-   used for backup, restore, lint, or explicit save/load checks. Do not
-   read save logs during ordinary turns when the conversation already
-   contains the needed continuity.
-
-`context_summary.md` and `session_log.md` are recovery surfaces. Read
-them only when switching LLMs, after the model's conversation context is
-lost, or when the user explicitly asks to load/recover from disk. In
-that case, read `context_summary.md` plus the latest ten detailed turns
-already rendered in `session_log.md`.
-
-Never read `session_log.jsonl` for ordinary play or recovery prompting.
-It is the complete archive for tooling, lint, audit, and replay only.
+Priority during play: **live conversation > user pack > universal rules
+> save backup**. Save files (`saves/<pack>/<save_id>/`) are durability
+surfaces, not ordinary read sources. `context_summary.md` + the latest
+10 entries rendered in `session_log.md` are recovery-only — read them
+on LLM switch, context loss, or explicit user load. Never read
+`session_log.jsonl` for play; it is the archive for lint / audit /
+replay only.
 
 ## Backup Policy
 
@@ -95,9 +80,6 @@ summary.
 - A single backup that batches more than 10 turns triggers exactly one
   segment covering the full out-of-window range; many small backups
   that accumulate past 10 unsummarized turns also trigger one segment.
-
-The LLM writes the compression text because it requires narrative
-judgment. Tools only persist and render the backup surfaces.
 
 ## Ordinary Turn
 
@@ -160,22 +142,12 @@ compact HUD.
 
 ## Conditional System Reminders
 
-- **Player agency:** player input outranks active threads and
-  objectives. Follow the player and let abandoned threads fall away.
-- **Canon / source-novel divergence:** protect hard novel rules from
-  `novel_rules.md` and `canon_guardrails.md`. Major divergence is a
-  backup trigger.
-- **Conflict frames:** open only for real tension with opposing wants;
-  update momentum and paid costs while live; resolve when stakes are
-  answered or the player walks away.
-- **Build hooks:** artifact, innate, and destiny labeled options appear
-  only when the current pivot makes them relevant. Default is zero
-  labeled options; at most one labeled option per turn.
-- **Health/death:** `critical` takes priority on the next turn. Before
-  terminal death, check survival-trigger precedence in order:
-  `bond_rescue`, `not_meant_to_die`, then `last_barrier`.
-- **Breakthrough:** stage advance happens only on climactic beats, never
-  more than once per turn, and triggers a backup write.
+- Player input outranks active threads. Let abandoned threads fall away.
+- Defend `novel_rules.md` + `canon_guardrails.md`. Major divergence triggers a backup.
+- Open conflict frames only for real opposing wants; update momentum + paid costs while live; resolve when stakes are answered.
+- Default zero labeled options; max one per turn; only on key beats.
+- `critical` is priority next turn. Before terminal death, check survival precedence: `bond_rescue` → `not_meant_to_die` → `last_barrier`.
+- Stage advance: climactic beats only, max one per turn, triggers a backup.
 
 ## Failure Handling
 
