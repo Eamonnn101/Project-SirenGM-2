@@ -154,9 +154,9 @@ This creates `current_scene.md`, `player.md`, `session_log.md`,
 
 ```bash
 python tools/lint_save.py --save <pack>/<save_id>
-python tools/inspect_save.py --save <pack>/<save_id>
+cat saves/<pack>/<save_id>/current_scene.md saves/<pack>/<save_id>/player.md
 ```
 
 `lint_save.py` must exit 0 before you tell the user the save is ready.
-Paste `inspect_save.py` output back to the user. Then wait for the
+Paste those two files' content back to the user. Then wait for the
 first turn per `playbooks/play-turn.md`.

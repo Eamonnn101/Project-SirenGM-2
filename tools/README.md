@@ -12,8 +12,6 @@ the agent do them by hand:
 | `lint_pack.py` | Rule-based validation of a genre pack (`--genre <name>`) or user pack (`--pack <name>`): required files, schema, cross-refs, orphan wiki-links, bare slugs on non-ASCII-named entities. |
 | `lint_save.py` | Rule-based validation of a save (`--save <pack>/<save_id>`): JSON legality, `turn ≡ len(session_log)`, `player.json ≡ world_state.player`, rendered-surface drift, `hidden_truths` consistency, slug existence against the pack. |
 | `render_save.py` | Re-render every markdown surface of a save (`current_scene.md`, `player.md`, detailed-window `session_log.md`, `hidden_truths.md`) from the canonical JSON state. Full `session_log.jsonl` remains the archive. |
-| `render_pack.py` | Expand the pack's `[[slug\|Display]]` wiki-links into plain Markdown links under `packs/<pack>/_rendered/` so the pack reads in any Markdown viewer. Canonical pages are left untouched. |
-| `inspect_save.py` | One-screen plain-text summary of a save's state. Read-only; use for diagnostics or recovery, not the ordinary turn loop. |
 
 Saves live at `saves/<pack>/<save_id>/`, so the canonical `--save`
 argument is `<pack>/<save_id>` (e.g. `mypack/save_001`). The `--save`
@@ -44,13 +42,10 @@ equivalent.
   `checkpoint_save.py --save <pack>/<save_id> --patch <patch.json> --render --lint`.
 - After manual backup JSON edits → run `render_save.py`, then `lint_save.py`.
 - After drafting pack pages in ingest → run `lint_pack.py --pack <pack>`.
-- When you want to read a pack's pages in a non-wikilink editor → run
-  `render_pack.py --pack <pack>` and browse `packs/<pack>/_rendered/`.
-- When orienting on an existing save → run `inspect_save.py --save <pack>/<save_id>`.
+- When orienting on an existing save → open `current_scene.md` + `player.md`.
 - When recovering from disk after losing conversation context → read
   `context_summary.md` and `session_log.md` (latest ten detailed
-  turns). Use `inspect_save.py --save <pack>/<save_id>` only as a
-  diagnostic seed.
+  turns), plus `current_scene.md` + `player.md` for the present state.
 - At the start of ingest → run `chunker.py <novel> --pack <pack>`.
 - Before relying on any save (e.g. for a save/load check) → run `lint_save.py --save <pack>/<save_id>`.
 

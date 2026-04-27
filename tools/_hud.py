@@ -5,8 +5,7 @@ Produces the two-layer text HUD described in the v0.5 plan:
 - `render_compact_turn_hud`  — Layer A, written at the top of
   `current_scene.md` at backup renders and mirrored provisionally in
   ordinary chat turns.
-- `render_full_build_hud`    — Layer B, written into `player.md` and
-  mirrored by `inspect_save.py`.
+- `render_full_build_hud`    — Layer B, written into `player.md`.
 
 All HUDs render in the pack's declared language (`zh` or `en`) with a
 consistent Unicode box grammar. Warning markers surface the 5-state

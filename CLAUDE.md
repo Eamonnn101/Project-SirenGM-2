@@ -171,7 +171,6 @@ Optional, deterministic, offline. Never call an LLM.
 | `python tools/checkpoint_save.py --save <pack>/<save_id> --patch <patch.json> --render --lint` | preferred backup helper; applies compact patches, appends detailed session entries, appends a new `context_summary.md` segment whenever 10+ turns have slid out without summary, then renders/lints |
 | `python tools/render_save.py --save <pack>/<save_id>` | after backup JSON writes; keeps markdown in sync and renders `session_log.md` as the latest ten-turn detailed window |
 | `python tools/lint_save.py --save <pack>/<save_id>` | after backups, or before trusting a save for load / save/load continuity checks |
-| `python tools/inspect_save.py --save <pack>/<save_id>` | diagnostics or recovery only; not part of the ordinary turn loop |
 
 The `--save` argument is resolved as `saves_root / <arg>`, so any path
 under `saves/` works — use `<pack>/<save_id>` so multiple packs can

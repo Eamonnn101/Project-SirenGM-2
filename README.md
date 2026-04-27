@@ -263,7 +263,6 @@ LLM.
 | `python tools/checkpoint_save.py --save <pack>/<save_id> --patch <patch.json> --render --lint` | Apply a compact backup patch, append detailed logs, append a new `context_summary.md` segment when 10+ turns have slid out without summary, render, and lint. |
 | `python tools/render_save.py --save <pack>/<save_id>` | Render markdown surfaces from canonical JSON; `session_log.md` is the latest ten-turn recovery window. |
 | `python tools/lint_save.py --save <pack>/<save_id>` | Validate a backed-up save. |
-| `python tools/inspect_save.py --save <pack>/<save_id>` | Print a compact save summary. |
 
 Optional local setup:
 

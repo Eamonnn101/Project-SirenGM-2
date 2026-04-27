@@ -2,7 +2,7 @@
 
 Kept in sync with the shapes the agent writes under
 saves/<pack>/<save_id>/ and packs/<pack>/. Imported by
-tools/lint_pack.py, tools/render_save.py, tools/inspect_save.py.
+tools/lint_pack.py and tools/render_save.py.
 """
 
 from __future__ import annotations
