@@ -1,10 +1,17 @@
-"""Progression-layer helpers: survival-trigger precedence, draft bias,
-and meta-progress merging.
+"""Progression-layer 算法规格模块。
 
-These functions are the deterministic core of the v0.5 progression
-layer. The playbooks and GM prompts reference them, but the agent does
-not need to call them on every turn — they exist so lint and inspection
-can reason about the same rules the agent follows in prose.
+本文件**不会被任何 Python 代码 import**。它存在的目的是：
+
+1. 给 GM playbook / prompt 提供稳定的算法句柄名
+   (resolve_survival_trigger, draft_bias_order, destiny_draw_order,
+   innate_draw_order, artifact_draw_order, merge_run_into_meta)，
+   方便 LLM 在散文里引用。
+2. 给人类读者一份可执行的参考实现，验证 prompt 描述的算法是否自洽。
+
+落地 runtime 时 LLM 自己按 prompt 规则在脑内执行。如果你正在 grep 查
+"谁 import 了 _progression"，答案是没人。这是有意为之。
+
+如需修改算法语义：先改这里的实现，再同步对应 prompt / playbook 段落。
 """
 
 from __future__ import annotations
