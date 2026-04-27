@@ -11,19 +11,14 @@ shape, with the "结局类别 / Outcome" field naming the difference.
 
 Triggered from `playbooks/death-and-restart.md`.
 
-## Precondition: survival-trigger precedence
+## Precondition
 
-Before running this coda for a death, the engine **must** have
-checked `resolve_survival_trigger(player, prior_health_state)`
-from `tools/_progression.py`. If any trigger fires, this coda
-does **not** run — the survival trigger narration runs instead.
-See `systems/health_and_death.md` § Survival-trigger precedence
-and `gm_system_fragment.md` § Survival trigger precedence.
-
-The order is fixed (artifact `bond_rescue` → destiny
-`not_meant_to_die` → destiny `last_barrier`). The coda below fires
-only after all applicable triggers have been exhausted or none
-applied.
+Survival-trigger precedence (artifact `bond_rescue` → destiny
+`not_meant_to_die` → destiny `last_barrier`) must have been checked
+and not fired. Spec: `gm_system_fragment.md` §Survival-trigger
+precedence. Handle: `tools/_progression.py::resolve_survival_trigger`.
+This coda runs only after all applicable triggers were exhausted or
+none applied.
 
 ## Terminal-death turn output
 

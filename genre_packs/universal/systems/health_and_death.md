@@ -47,37 +47,14 @@ The only rule is: the danger stays visible, and the prose never
 silently flattens back to "healthy" without the scene having done
 the work.
 
-## Survival-trigger precedence (load-bearing)
+## Survival-trigger precedence
 
-Before a `player_health_state: "dead"` patch becomes terminal, the
-engine checks the following triggers in this fixed order. Any one
-firing replaces the patch with the trigger's outcome: `health_state
-→ critical`, the relevant artifact/trait is exhausted, and the
-narration shows the trigger firing. The turn is **not** terminal.
-
-**Precedence order:**
-
-1. **Artifact `bond_rescue` archetype.** If `player.artifact.archetype
-   == "bond_rescue"` and `player.artifact.used == False`, the
-   artifact fires → critical, artifact `used: true`.
-2. **Destiny `not_meant_to_die`.** If a destiny trait with this
-   archetype exists and is not exhausted, it fires → critical,
-   trait `exhausted: true`.
-3. **Destiny `last_barrier`.** Only on the specific transition
-   `critical → dead` (not a skip-to-dead from healthy/hurt/badly_hurt).
-   Fires → the turn stays at `critical` (one extra buffer turn),
-   trait `exhausted: true`. Next turn the danger returns full-force.
-
-If none of the above applies, the terminal death flow runs.
-Implementation lives in `tools/_progression.py ::
-resolve_survival_trigger`; the agent must follow the same order
-when narrating.
-
-**No other MVP trigger prevents death.** Novel-themed destiny
-traits with death-flavored prose still map to one of the 12
-universal seeds, and only the two above (`not_meant_to_die`,
-`last_barrier`, plus any `bond_rescue` artifact) carry
-death-prevention semantics.
+Canonical spec lives in `genre_packs/universal/prompts/gm_system_fragment.md`
+§Survival-trigger precedence. Order: artifact `bond_rescue` → destiny
+`not_meant_to_die` → destiny `last_barrier`. Algorithmic handle:
+`tools/_progression.py::resolve_survival_trigger`. No other MVP trigger
+prevents death; novel-themed destiny prose still maps to one of those
+three seed slots.
 
 ## Terminal death flow
 
