@@ -271,8 +271,7 @@ Guardrails:
   always carry a display label (the lint rejects bare slugs pointing
   at non-ASCII-named entities). See
   `genre_packs/universal/prompts/ingest_draft_system.md` for the
-  full rule; `python tools/render_pack.py --pack <slug>` rewrites
-  these into plain Markdown links under `packs/<slug>/_rendered/`.
+  full rule. Obsidian renders these wiki-links natively.
 - If mentions conflict, prefer the latest chunk and record the older
   claim under `packs/<slug>/contradictions/ambiguous_points.md`
   (append-only).
@@ -307,16 +306,6 @@ python tools/lint_pack.py --pack <slug>
 
 If issues are reported, loop back to Stage 3 for the affected pages.
 Do NOT proceed to `playbooks/new-game.md` until lint is clean.
-
-Optionally, render the pack's wiki-link cross-references into plain
-Markdown for reading in a non-wikilink editor:
-
-```bash
-python tools/render_pack.py --pack <slug>
-```
-
-This writes expanded copies under `packs/<slug>/_rendered/` (the
-canonical sources keep the `[[slug|Display]]` form).
 
 ## What to tell the user at the end
 

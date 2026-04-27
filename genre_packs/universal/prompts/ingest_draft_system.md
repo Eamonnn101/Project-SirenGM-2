@@ -158,12 +158,10 @@ Use the piped wiki-link dialect:
   entity's `name` is ASCII (typical in English packs). Never emit
   bare `[[xiao_yan]]`.
 
-The slug is what the lint and renderer resolve; the display label
-is what the player reads. `tools/lint_pack.py` rejects bare slugs
-that point at non-ASCII-named entities, and
-`tools/render_pack.py` rewrites `[[slug|Display]]` into
-`[Display](<relative path>)` for plain-Markdown readers. Do not
-hyperlink to URLs or external docs.
+The slug is what the lint resolves; the display label is what the
+player reads. `tools/lint_pack.py` rejects bare slugs that point at
+non-ASCII-named entities. Wiki-link readers (Obsidian, etc.) follow
+`[[slug|Display]]` natively. Do not hyperlink to URLs or external docs.
 
 ## Anti-patterns
 
