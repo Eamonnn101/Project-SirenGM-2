@@ -31,30 +31,37 @@ story pack -> backed-up game state.
 
 ## Current Version
 
-**v0.6.0 - Core Play Kernel + backup runtime**
+**v0.7.0 — Slimmed prompts + leaner runtime**
 
-This release focuses on performance and weak-model compatibility. The
-full gameplay surface remains intact, but ordinary turns no longer ask
-the model to reread and rewrite the whole project state every time.
+This release extends v0.6's token-efficiency focus by removing duplicate
+text from the GM system prompt, condensing playbooks, and deleting two
+helper tools whose output was already covered by `render_save.py` plus
+a wiki-link-aware editor (Obsidian). Core gameplay is unchanged.
 
-- **Core Play Kernel:** every turn privately follows five stable rules:
-  understand intent, check danger/conflict, check relevant
-  artifact/trait hooks, resolve with consequence, then decide whether to
-  write a backup.
-- **Backup runtime:** ordinary turns use the conversation window and the
-  pack. Save files are durability/recovery surfaces, not the default
-  information source.
-- **Recovery memory:** save files are backups. If a new LLM has to
-  continue the run or the conversation context is lost, read
-  `context_summary.md` plus the latest ten detailed turns in
-  `session_log.md`. `session_log.jsonl` is the full archive only.
-- **Immediate backup triggers:** death, critical/dead health, breakthrough,
-  destiny gain/exhaustion, artifact use/exhaustion, conflict resolution,
-  major scene/world/faction change, important NPC death or betrayal,
-  restart, explicit save request, or major source-novel divergence.
-
-The goal is simple: preserve SirenGM's core experience while reducing
-per-turn cognitive load and file I/O.
+- **Lighter GM prompt.** `gm_system_fragment.md` — spliced into the GM
+  prompt once per session — trimmed by ~1,100 words (~270 tokens). The
+  compact-HUD spec is delegated to `tools/_hud.py`; the key-beat list,
+  role description, and pre-options scan are condensed. Redundant
+  sections (`Role` ↔ `style_guide`, `What the GM does not do` ↔
+  `Player agency`, multi-section HUD format) merged.
+- **Incremental `context_summary.md`.** Session-log detail window grew
+  from 5 to 10 turns. `context_summary.md` is now built up by appending
+  a new segment every 10 turns that slide out of the window — existing
+  segments are never edited. A per-save cursor in
+  `meta.json::context_summary_through_turn` tracks coverage.
+- **Hard backup-policy whitelist.** `playbooks/play-turn.md` replaced
+  its soft "feels save-worthy" trigger with a whitelist of structured
+  state changes: `risk_level`, `current_location`,
+  `player.{stage_index, health_state, destiny_traits, artifact.used}`,
+  `hidden_truths`, conflict open/resolve, and any
+  `Relationship.status` enum flip.
+- **Removed duplicate tools.** `tools/inspect_save.py` (output already
+  written to `player.md`) and `tools/render_pack.py` (this repo is read
+  in Obsidian, which renders wiki-links natively) deleted.
+- **Single-source survival precedence.** The full spec lives only in
+  `gm_system_fragment.md`; `systems/health_and_death.md` and
+  `prompts/death_coda.md` now reference it. `tools/_progression.py` is
+  reframed as a spec-only module (no Python ever imports it).
 
 ## Quickstart
 
@@ -300,6 +307,31 @@ Important rules:
 - Do not add a new product CLI, web UI, daemon, or network runtime.
 
 ## Changelog
+
+### v0.7.0
+
+- Aggressive subtractive refactor of the GM prompt
+  (`gm_system_fragment.md` 679 → 553 lines, ~1,100 words /
+  ~270 tokens cut per session start). Compact-HUD format delegated to
+  `tools/_hud.py`; sections collapsed into runtime constraints +
+  references.
+- `context_summary.md` is now built up by appending one new segment
+  every 10 turns that slide out of the detail window, instead of being
+  rewritten on every backup. Window grew from 5 to 10 turns. New
+  cursor field `meta.json::context_summary_through_turn`.
+- Backup policy in `playbooks/play-turn.md` replaced its soft
+  "feels save-worthy" judgment with a hard whitelist of structured
+  state changes.
+- Removed `tools/inspect_save.py` (duplicated `player.md`) and
+  `tools/render_pack.py` (Obsidian renders wiki-links natively).
+- Survival-trigger precedence canonicalized to one full spec in
+  `gm_system_fragment.md`; `systems/health_and_death.md` and
+  `prompts/death_coda.md` reference it instead of duplicating.
+- `tools/_progression.py` reframed as a spec-only module — never
+  imported by Python; the LLM mentally executes its functions per
+  prompt references.
+
+Net: 15 files changed, +126 / -712 lines.
 
 ### v0.6.0
 
